@@ -1,0 +1,6 @@
+# Use this file only on a development machine. It lets "npm run dev" and the database tests reach Postgres.
+# Start it with "npm run db:dev".
+services:
+  db:
+    ports:
+      - '127.0.0.1:5432:5432'

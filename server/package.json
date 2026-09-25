@@ -1,0 +1,15 @@
+{
+  "name": "questforge-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=../.env --watch src/index.js",
+    "start": "node src/index.js",
+    "test": "node --env-file-if-exists=../.env --test"
+  },
+  "dependencies": {
+    "pg": "^8.23.0",
+    "questforge-shared": "*",
+    "ws": "^8.21.3"
+  }
+}

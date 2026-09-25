@@ -1,0 +1,8 @@
+{
+  "name": "questforge-shared",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}

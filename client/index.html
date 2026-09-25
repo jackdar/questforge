@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Questforge</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: system-ui, sans-serif;
+      }
+      #controls {
+        position: fixed;
+        top: 104px;
+        left: 12px;
+        max-width: 260px;
+        padding: 6px 10px;
+        color: #fff;
+        background: rgb(0 0 0 / 50%);
+        border-radius: 4px;
+        font-size: 13px;
+        user-select: none;
+      }
+      .keybind-list {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 4px 10px;
+        font-size: 12px;
+      }
+      #chat {
+        position: fixed;
+        bottom: 130px;
+        left: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        width: min(340px, calc(100vw - 24px));
+      }
+      .chat-log {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        max-height: 180px;
+        overflow-y: auto;
+        color: #fff;
+        font-size: 13px;
+        text-shadow: 0 1px 2px #000;
+        overflow-wrap: anywhere;
+      }
+      .chat-sender {
+        color: #ffd24a;
+        font-weight: 600;
+      }
+      .chat-system {
+        color: #ff6b6b;
+      }
+      .chat-form input {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 6px 8px;
+        color: #fff;
+        font-size: 13px;
+        background: rgb(14 17 25 / 90%);
+        border: 1px solid #ffd24a;
+        border-radius: 4px;
+      }
+      .keybind-list[hidden] {
+        display: none;
+      }
+      .keybind-row {
+        display: contents;
+      }
+      .keybind-row kbd {
+        padding: 1px 6px;
+        color: #ffd24a;
+        font: 600 11px ui-monospace, monospace;
+        white-space: nowrap;
+        background: #0e1119;
+        border: 1px solid #5b6478;
+        border-radius: 3px;
+      }
+      #stats {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        display: flex;
+        gap: 10px;
+        padding: 4px 8px;
+        color: #fff;
+        background: rgb(0 0 0 / 50%);
+        border-radius: 4px;
+        font: 12px ui-monospace, monospace;
+        user-select: none;
+        pointer-events: none;
+      }
+      #unit-frames {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        display: flex;
+        gap: 12px;
+        user-select: none;
+      }
+      .unit-frame {
+        width: 200px;
+        padding: 6px 8px;
+        color: #fff;
+        background: rgb(0 0 0 / 60%);
+        border-radius: 4px;
+      }
+      #player-frame {
+        cursor: pointer;
+      }
+      .unit-name {
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .unit-name[data-relationship='hostile'] {
+        color: #ff5b5b;
+      }
+      .unit-name[data-relationship='friendly'] {
+        color: #5dde7a;
+      }
+      .unit-details {
+        margin-bottom: 4px;
+        color: #c8c8c8;
+        font-size: 11px;
+      }
+      .health-bar,
+      .mana-bar {
+        position: relative;
+        height: 16px;
+        background: #3a1010;
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .mana-bar {
+        margin-top: 3px;
+        background: #101a3a;
+      }
+      .health-fill,
+      .mana-fill {
+        height: 100%;
+        background: #2ea043;
+      }
+      .mana-fill {
+        background: #3b6fd8;
+      }
+      .health-text,
+      .mana-text {
+        position: absolute;
+        inset: 0;
+        font-size: 11px;
+        line-height: 16px;
+        text-align: center;
+      }
+      #action-bar {
+        position: fixed;
+        bottom: 16px;
+        left: 50%;
+        display: flex;
+        gap: 6px;
+        transform: translateX(-50%);
+      }
+      .action-button {
+        position: relative;
+        width: 64px;
+        height: 64px;
+        padding: 4px;
+        overflow: hidden;
+        color: #fff;
+        font: 11px system-ui, sans-serif;
+        background: #1d2330;
+        border: 2px solid #5b6478;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .action-button.not-enough-mana {
+        filter: brightness(0.5) sepia(1) hue-rotate(180deg);
+      }
+      .action-button.cannot-reach-target {
+        color: #ff6b6b;
+        background: #4a1a1a;
+      }
+      .action-button.active {
+        border-color: #ffd24a;
+        box-shadow: 0 0 8px #ffd24a;
+      }
+      .action-key {
+        position: absolute;
+        top: 3px;
+        left: 5px;
+        color: #ffd24a;
+      }
+      .cooldown-overlay {
+        position: absolute;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: 0;
+        background: rgb(0 0 0 / 65%);
+      }
+      #cast-bar {
+        position: fixed;
+        bottom: 150px;
+        left: 50%;
+        width: 240px;
+        height: 18px;
+        overflow: hidden;
+        background: rgb(0 0 0 / 60%);
+        border: 1px solid #000;
+        border-radius: 3px;
+        transform: translateX(-50%);
+      }
+      .cast-fill {
+        height: 100%;
+        background: #d4a017;
+      }
+      .cast-name {
+        position: absolute;
+        inset: 0;
+        color: #fff;
+        font-size: 12px;
+        line-height: 18px;
+        text-align: center;
+      }
+      #error-message {
+        position: fixed;
+        z-index: 10;
+        top: 80px;
+        right: 0;
+        left: 0;
+        color: #ff4d4d;
+        font-weight: 600;
+        text-align: center;
+        text-shadow: 0 1px 2px #000;
+        pointer-events: none;
+      }
+      #floating-text-layer {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .floating-text {
+        position: absolute;
+        font-size: 18px;
+        font-weight: 700;
+        text-shadow: 0 1px 2px #000;
+        transform: translate(-50%, -50%);
+      }
+      .floating-text.damage {
+        color: #ffec3d;
+      }
+      .floating-text.heal {
+        color: #5dff7a;
+      }
+      .screen {
+        position: fixed;
+        z-index: 5;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        color: #fff;
+        background: rgb(0 0 0 / 70%);
+      }
+      .screen[hidden] {
+        display: none;
+      }
+      .login-form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 280px;
+        padding: 20px;
+        background: rgb(20 24 34 / 90%);
+        border: 1px solid #5b6478;
+        border-radius: 8px;
+      }
+      .login-form label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 13px;
+      }
+      .login-form input {
+        padding: 8px;
+        color: #fff;
+        font-size: 14px;
+        background: #0e1119;
+        border: 1px solid #5b6478;
+        border-radius: 4px;
+      }
+      .form-buttons {
+        display: flex;
+        gap: 8px;
+      }
+      .form-buttons button,
+      .account-bar button {
+        flex: 1;
+        padding: 8px;
+        color: #fff;
+        font: 600 14px system-ui, sans-serif;
+        background: #2f3a52;
+        border: 1px solid #5b6478;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .form-buttons button[type='submit'] {
+        background: #1f4f99;
+      }
+      .form-buttons button:disabled {
+        opacity: 0.5;
+        cursor: wait;
+      }
+      .form-error {
+        min-height: 1.2em;
+        color: #ff6b6b;
+        font-size: 13px;
+      }
+      .account-bar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 13px;
+      }
+      .faction-choices {
+        display: flex;
+        gap: 16px;
+      }
+      .faction-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        width: 180px;
+        padding: 12px;
+        color: #fff;
+        font: 600 18px system-ui, sans-serif;
+        border: 2px solid #fff;
+        border-radius: 6px;
+        cursor: pointer;
+      }
+      .faction-preview {
+        width: 150px;
+        height: 200px;
+      }
+      .faction-button.selected {
+        border-color: #ffd24a;
+        box-shadow: 0 0 12px #ffd24a;
+      }
+      .character-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        width: 320px;
+        padding: 20px;
+        background: rgb(20 24 34 / 90%);
+        border: 1px solid #5b6478;
+        border-radius: 8px;
+      }
+      .character-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .character-entry {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 8px 10px;
+        color: #fff;
+        font: 14px system-ui, sans-serif;
+        text-align: left;
+        background: #0e1119;
+        border: 1px solid #5b6478;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .character-entry.selected {
+        border-color: #ffd24a;
+      }
+      .character-name {
+        font-weight: 600;
+      }
+      .character-details {
+        color: #c8c8c8;
+        font-size: 12px;
+      }
+      #nameplate-layer {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .nameplate {
+        position: absolute;
+        font-size: 13px;
+        font-weight: 600;
+        white-space: nowrap;
+        text-shadow: 0 1px 2px #000;
+        transform: translate(-50%, -100%);
+      }
+      .nameplate[data-relationship='self'] {
+        color: #fff;
+      }
+      .nameplate[data-relationship='friendly'] {
+        color: #5dde7a;
+      }
+      .nameplate[data-relationship='hostile'] {
+        color: #ff5b5b;
+      }
+      #game-menu {
+        background: rgb(0 0 0 / 35%);
+      }
+      .game-menu-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        width: 300px;
+        padding: 16px;
+        background: rgb(20 24 34 / 95%);
+        border: 1px solid #5b6478;
+        border-radius: 8px;
+      }
+      .game-menu-panel h3 {
+        margin: 8px 0 0;
+        font-size: 14px;
+      }
+      .game-menu-panel h2 {
+        margin: 0 0 4px;
+        font-size: 18px;
+        text-align: center;
+      }
+      .game-menu-panel button {
+        padding: 8px;
+        color: #fff;
+        font: 600 14px system-ui, sans-serif;
+        background: #2f3a52;
+        border: 1px solid #5b6478;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .faction-button[data-faction='dawnguard'] {
+        background: #1f4f99;
+      }
+      .faction-button[data-faction='emberclaw'] {
+        background: #8f2a1a;
+      }
+      #action-bar,
+      #cast-bar,
+      #error-message {
+        user-select: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stats"><span class="fps">– FPS</span><span class="ping">– ms</span></div>
+    <div id="unit-frames">
+      <div id="player-frame" class="unit-frame" hidden>
+        <div class="unit-name"></div>
+        <div class="unit-details"></div>
+        <div class="health-bar"><div class="health-fill"></div><div class="health-text"></div></div>
+        <div class="mana-bar"><div class="mana-fill"></div><div class="mana-text"></div></div>
+      </div>
+      <div id="target-frame" class="unit-frame" hidden>
+        <div class="unit-name"></div>
+        <div class="unit-details"></div>
+        <div class="health-bar"><div class="health-fill"></div><div class="health-text"></div></div>
+        <div class="mana-bar"><div class="mana-fill"></div><div class="mana-text"></div></div>
+      </div>
+    </div>
+    <div id="nameplate-layer"></div>
+    <div id="floating-text-layer"></div>
+    <div id="error-message" hidden></div>
+    <div id="cast-bar" hidden><div class="cast-fill"></div><div class="cast-name"></div></div>
+    <div id="action-bar"></div>
+    <div id="chat" hidden>
+      <div class="chat-log" aria-live="polite"></div>
+      <form class="chat-form" hidden>
+        <input name="message" autocomplete="off" placeholder="Say something, then press Enter" />
+      </form>
+    </div>
+    <div id="login-screen" class="screen" hidden>
+      <h1>Questforge</h1>
+      <form class="login-form">
+        <label>Username <input name="username" autocomplete="username" required /></label>
+        <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
+        <div class="form-error" role="alert"></div>
+        <div class="form-buttons">
+          <button type="submit">Log in</button>
+          <button type="button" data-action="register">Create account</button>
+        </div>
+      </form>
+    </div>
+    <div id="game-menu" class="screen" hidden>
+      <div class="game-menu-panel">
+        <h2>Game Menu</h2>
+        <button type="button" data-action="return-to-game">Return to Game</button>
+        <button type="button" data-action="log-out">Log Out</button>
+        <h3>Key bindings</h3>
+        <div class="keybind-list"></div>
+      </div>
+    </div>
+    <div id="character-select" class="screen" hidden>
+      <div class="account-bar"><span class="logged-in-as"></span><button data-action="logout">Log out</button></div>
+      <h1>Choose a character</h1>
+      <div class="character-panel">
+        <div class="character-list"></div>
+        <p class="character-list-empty" hidden>You have no characters yet. Create one to play.</p>
+        <div class="form-error" role="alert"></div>
+        <div class="form-buttons">
+          <button type="button" data-action="enter-world">Enter world</button>
+          <button type="button" data-action="create-character">Create character</button>
+        </div>
+      </div>
+    </div>
+    <div id="character-create" class="screen" hidden>
+      <h1>Create a character</h1>
+      <div class="faction-choices"></div>
+      <form class="login-form">
+        <label>Name <input name="name" autocomplete="off" maxlength="12" required /></label>
+        <div class="form-error" role="alert"></div>
+        <div class="form-buttons">
+          <button type="submit">Create</button>
+          <button type="button" data-action="back">Back</button>
+        </div>
+      </form>
+    </div>
+    <div id="controls" hidden>
+      <div class="help-prompt">Press H for help</div>
+      <div class="keybind-list" hidden></div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

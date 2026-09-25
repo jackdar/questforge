@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env. Copy .env.example to start.}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env. Copy .env.example to start.}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env. Copy .env.example to start.}
+    volumes:
+      - db-data:/var/lib/postgresql
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+
+  server:
+    build:
+      context: .
+      target: server
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      PORT: 3030
+      SECURE_COOKIES: ${SECURE_COOKIES:-false}
+    networks:
+      - frontend
+      - backend
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1:3030/health']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      target: web
+    depends_on:
+      server:
+        condition: service_healthy
+    # Only this machine can reach the game by default. A reverse proxy on another machine needs WEB_BIND_ADDRESS=0.0.0.0.
+    ports:
+      - '${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-8080}:80'
+    networks:
+      - frontend
+    restart: unless-stopped
+
+# Only the server joins both networks, so nginx cannot reach the database.
+networks:
+  frontend:
+  backend:
+
+volumes:
+  db-data:
