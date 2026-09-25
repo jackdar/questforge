@@ -23,3 +23,11 @@ test('an entity without a faction is hostile to a player', () => {
 test('two entities without a faction are hostile to each other', () => {
   assert.equal(getRelationship({ id: 'wolf', faction: null }, { id: 'dummy', faction: null }), 'hostile');
 });
+
+test('an NPC is friendly to players of both factions', () => {
+  const npc = { id: 'marshal', kind: 'npc', faction: null };
+
+  assert.equal(getRelationship(dawnguardAlice, npc), 'friendly');
+  assert.equal(getRelationship({ id: 'eve', faction: 'emberclaw' }, npc), 'friendly');
+  assert.equal(getRelationship(npc, dawnguardAlice), 'friendly');
+});

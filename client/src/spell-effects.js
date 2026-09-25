@@ -1,6 +1,6 @@
 import * as THREE from 'three';
+import { SPELLS } from 'questforge-shared/spells.js';
 
-const PROJECTILE_SPEED = 30;
 const PROJECTILE_HEIGHT = 1.5;
 const FLOATING_TEXT_HEIGHT = 2.5;
 const FLOATING_TEXT_RISE = 1.5;
@@ -14,29 +14,38 @@ const PROJECTILE_COLORS = {
   iceLance: 0x7ad7ff,
 };
 
-export function createSpellEffects({ scene, camera, getEntityPosition }) {
+export function createSpellEffects({ scene, camera, getEntityPosition, onImpact }) {
   const textLayer = document.getElementById('floating-text-layer');
   const projectileGeometry = new THREE.SphereGeometry(0.25, 12, 8);
   const projectiles = [];
   const floatingTexts = [];
 
-  // The server applies the effect at once. The projectile is only a visual, so the health bar can drop before it arrives.
-  function showSpellHit({ casterId, targetId, spellId, effect, amount }, now) {
+  // The projectile is a visual of the one that the server flies. The server sends the hit when its projectile lands.
+  function launchProjectile({ casterId, targetId, spellId }) {
     const casterPosition = getEntityPosition(casterId);
-    const targetPosition = getEntityPosition(targetId);
-    if (!targetPosition) return;
-
-    const text = effect === 'heal' ? `+${amount}` : `-${amount}`;
     const projectileColor = PROJECTILE_COLORS[spellId];
-    if (!projectileColor || !casterPosition) {
-      addFloatingText(targetId, targetPosition, text, effect, now);
-      return;
-    }
+    if (!projectileColor || !casterPosition) return;
 
     const mesh = new THREE.Mesh(projectileGeometry, new THREE.MeshBasicMaterial({ color: projectileColor }));
     mesh.position.set(casterPosition.x, casterPosition.y + PROJECTILE_HEIGHT, casterPosition.z);
     scene.add(mesh);
-    projectiles.push({ mesh, targetId, text, effect });
+    projectiles.push({ mesh, casterId, targetId, spellId, speed: SPELLS[spellId].projectileSpeed });
+  }
+
+  // Network timing can make the hit arrive before the drawn projectile reaches the target. The hit then removes it.
+  function showSpellHit(spellHit, now) {
+    const { casterId, targetId, spellId, effect, amount } = spellHit;
+    const projectile = projectiles.find(
+      (flying) => flying.casterId === casterId && flying.targetId === targetId && flying.spellId === spellId,
+    );
+    if (projectile) removeProjectile(projectile);
+
+    const targetPosition = getEntityPosition(targetId);
+    if (!targetPosition) return;
+    // Poison, such as the Poison Bite of the Broodmother, shows green numbers.
+    const style = effect === 'damage' && SPELLS[spellId]?.school === 'nature' ? 'damage poison' : effect;
+    addFloatingText(targetId, targetPosition, floatingTextFor(effect, amount), style, now);
+    onImpact(spellHit);
   }
 
   function addFloatingText(targetId, position, text, effect, now) {
@@ -52,11 +61,11 @@ export function createSpellEffects({ scene, camera, getEntityPosition }) {
   }
 
   function update(deltaSeconds, now) {
-    updateProjectiles(deltaSeconds, now);
+    updateProjectiles(deltaSeconds);
     updateFloatingTexts(now);
   }
 
-  function updateProjectiles(deltaSeconds, now) {
+  function updateProjectiles(deltaSeconds) {
     for (const projectile of [...projectiles]) {
       const targetPosition = getEntityPosition(projectile.targetId);
       if (!targetPosition) {
@@ -66,11 +75,10 @@ export function createSpellEffects({ scene, camera, getEntityPosition }) {
 
       const aimPoint = new THREE.Vector3(targetPosition.x, targetPosition.y + PROJECTILE_HEIGHT, targetPosition.z);
       const toTarget = aimPoint.sub(projectile.mesh.position);
-      const step = PROJECTILE_SPEED * deltaSeconds;
+      const step = projectile.speed * deltaSeconds;
 
       if (toTarget.length() <= step) {
         removeProjectile(projectile);
-        addFloatingText(projectile.targetId, targetPosition, projectile.text, projectile.effect, now);
       } else {
         projectile.mesh.position.addScaledVector(toTarget.normalize(), step);
       }
@@ -104,5 +112,11 @@ export function createSpellEffects({ scene, camera, getEntityPosition }) {
     }
   }
 
-  return { showSpellHit, update };
+  return { launchProjectile, showSpellHit, update };
+}
+
+function floatingTextFor(effect, amount) {
+  if (effect === 'heal') return `+${amount}`;
+  if (effect === 'evade') return 'Evade';
+  return `-${amount}`;
 }

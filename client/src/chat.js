@@ -1,4 +1,5 @@
 import { CHAT_MAX_LENGTH } from 'questforge-shared/chat-rules.js';
+import { formatMoney } from 'questforge-shared/money.js';
 
 const MAX_VISIBLE_LINES = 50;
 
@@ -44,6 +45,55 @@ export function createChat(onSend) {
     addLine('chat-system', text);
   }
 
+  function addPartyMessage(text) {
+    addLine('chat-party', text);
+  }
+
+  function addLootMessage(item, quantity) {
+    addItemLine('You receive loot: ', item, quantity);
+  }
+
+  function addMoneyLootedMessage(copper) {
+    addLine('chat-loot', `You loot ${formatMoney(copper)}.`);
+  }
+
+  function addItemBoughtMessage(item) {
+    addItemLine('You buy ', item, 1);
+  }
+
+  function addItemSoldMessage({ name, quality }, quantity, copper) {
+    const itemName = document.createElement('span');
+    itemName.className = 'item-name';
+    itemName.dataset.quality = quality;
+    itemName.textContent = `[${name}]`;
+    const amount = quantity > 1 ? ` x${quantity}` : '';
+    addLine('chat-loot', 'You sell ', itemName, `${amount} for ${formatMoney(copper)}.`);
+  }
+
+  function addQuestRewardMessage(item, quantity) {
+    addItemLine('You receive item: ', item, quantity);
+  }
+
+  function addQuestCompletedMessage(questName) {
+    addLine('chat-quest', `${questName} completed.`);
+  }
+
+  function addExperienceMessage(xp) {
+    addLine('chat-quest', `You gain ${xp} experience.`);
+  }
+
+  function addLevelUpMessage(level) {
+    addLine('chat-quest', `You have reached level ${level}!`);
+  }
+
+  function addItemLine(prefix, { name, quality }, quantity) {
+    const itemName = document.createElement('span');
+    itemName.className = 'item-name';
+    itemName.dataset.quality = quality;
+    itemName.textContent = `[${name}]`;
+    addLine('chat-loot', prefix, itemName, quantity > 1 ? ` x${quantity}.` : '.');
+  }
+
   function addLine(className, ...content) {
     const line = document.createElement('div');
     line.className = `chat-line ${className}`;
@@ -63,5 +113,21 @@ export function createChat(onSend) {
     container.hidden = true;
   }
 
-  return { show, hide, openInput, addMessage, addSystemMessage, isInputOpen: () => !form.hidden };
+  return {
+    show,
+    hide,
+    openInput,
+    addMessage,
+    addSystemMessage,
+    addPartyMessage,
+    addLootMessage,
+    addMoneyLootedMessage,
+    addItemBoughtMessage,
+    addItemSoldMessage,
+    addQuestRewardMessage,
+    addQuestCompletedMessage,
+    addExperienceMessage,
+    addLevelUpMessage,
+    isInputOpen: () => !form.hidden,
+  };
 }

@@ -1,0 +1,98 @@
+// How to add a creature: add an entry here, a loot table and a money table in loot-tables.js, and spawn points in
+// server/src/index.js. The model names a model in client/src/character-model.js.
+// The wander radius is how far the creature walks around its spawn point when it is out of combat.
+// The aggro radius is how close a player can come before the creature attacks. A neutral creature, as in WoW, never
+// attacks first: it fights only once someone damages it, and it shows a yellow name.
+// A spawn point can give a creature a different level, so that some creatures of a kind are harder.
+// A boss can have abilities, which it casts at its target whenever their cooldown allows, and a summon, which calls
+// more creatures once when its health falls to the given fraction. The cave creatures are tuned for a party of two
+// players of level 6 or 7.
+export const CREATURES = {
+  wolf: {
+    kind: 'wolf',
+    name: 'Grey Wolf',
+    level: 1,
+    maxHealth: 60,
+    attackSpellId: 'bite',
+    respawnDelayMs: 30000,
+    wanderRadius: 5,
+    aggroRadius: 10,
+    isNeutral: true,
+    lootTableId: 'greyWolf',
+    model: 'wolf',
+  },
+  alphaWolf: {
+    kind: 'alphaWolf',
+    name: 'Alpha Wolf',
+    level: 3,
+    maxHealth: 100,
+    attackSpellId: 'alphaBite',
+    respawnDelayMs: 90000,
+    wanderRadius: 8,
+    aggroRadius: 15,
+    lootTableId: 'alphaWolf',
+    model: 'alphaWolf',
+  },
+  bandit: {
+    kind: 'bandit',
+    name: 'Bandit Thug',
+    level: 3,
+    maxHealth: 90,
+    attackSpellId: 'slash',
+    respawnDelayMs: 60000,
+    wanderRadius: 2,
+    aggroRadius: 10,
+    lootTableId: 'banditThug',
+    model: 'bandit',
+  },
+  banditLeader: {
+    kind: 'banditLeader',
+    name: 'Bandit Leader',
+    level: 5,
+    maxHealth: 160,
+    attackSpellId: 'heavySlash',
+    respawnDelayMs: 120000,
+    wanderRadius: 1,
+    aggroRadius: 10,
+    lootTableId: 'banditLeader',
+    model: 'banditLeader',
+  },
+  giantCaveSpider: {
+    kind: 'giantCaveSpider',
+    name: 'Giant Cave Spider',
+    level: 7,
+    maxHealth: 300,
+    attackSpellId: 'venomBite',
+    respawnDelayMs: 60000,
+    wanderRadius: 2,
+    aggroRadius: 10,
+    lootTableId: 'giantCaveSpider',
+    model: 'giantSpider',
+  },
+  spiderling: {
+    kind: 'spiderling',
+    name: 'Spiderling',
+    level: 7,
+    maxHealth: 60,
+    attackSpellId: 'spiderlingBite',
+    respawnDelayMs: 60000,
+    wanderRadius: 1,
+    aggroRadius: 10,
+    lootTableId: 'spiderling',
+    model: 'spiderling',
+  },
+  broodmother: {
+    kind: 'broodmother',
+    name: 'Broodmother',
+    level: 9,
+    maxHealth: 800,
+    attackSpellId: 'crushingBite',
+    respawnDelayMs: 60000,
+    wanderRadius: 1,
+    aggroRadius: 14,
+    lootTableId: 'broodmother',
+    model: 'broodmother',
+    abilities: ['poisonBite'],
+    summon: { atHealthFraction: 0.5, kind: 'spiderling', count: 2 },
+  },
+};

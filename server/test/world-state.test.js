@@ -1,7 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { WORLD_MAX_HEIGHT } from 'questforge-shared/terrain.js';
-import { createWorldState, WORLD_HALF_SIZE, MAX_HEALTH, MAX_MANA, DUMMY_LEVEL } from '../src/world-state.js';
+import { CREATURES } from 'questforge-shared/creatures.js';
+import { groundHeightAt, WORLD_HALF_SIZE, WORLD_MAX_HEIGHT } from 'questforge-shared/terrain.js';
+import {
+  createWorldState,
+  MAX_HEALTH,
+  MAX_MANA,
+  DUMMY_LEVEL,
+} from '../src/world-state.js';
 
 const newAlice = {
   id: 'alice',
@@ -49,6 +55,188 @@ test('a new dummy appears at its given position with full health and mana', () =
       maxMana: MAX_MANA,
     },
   ]);
+});
+
+test('a new wolf appears at its given position with full wolf health and no mana', () => {
+  const world = createWorldState();
+
+  world.addCreature('wolf-1', 'wolf', { x: -30, z: 20, rotation: 1 });
+
+  assert.deepEqual(world.snapshot(), [
+    {
+      id: 'wolf-1',
+      kind: 'wolf',
+      name: 'Grey Wolf',
+      faction: null,
+      level: CREATURES.wolf.level,
+      isEvading: false,
+      lootableBy: [],
+      x: -30,
+      y: 0,
+      z: 20,
+      rotation: 1,
+      health: CREATURES.wolf.maxHealth,
+      maxHealth: CREATURES.wolf.maxHealth,
+      mana: 0,
+      maxMana: 0,
+    },
+  ]);
+});
+
+test('a wolf cannot be moved as a player', () => {
+  const world = createWorldState();
+  world.addCreature('wolf-1', 'wolf', { x: -30, z: 20, rotation: 1 });
+
+  const moved = world.movePlayer('wolf-1', { x: 0, y: 0, z: 0, rotation: 0 });
+
+  assert.equal(moved, false);
+  assert.equal(world.getEntity('wolf-1').x, -30);
+});
+
+test('a spawn point can give a creature a level other than the usual level of its kind', () => {
+  const world = createWorldState();
+
+  world.addCreature('wolf-1', 'wolf', { x: 0, z: 0, rotation: 0 }, { level: 2 });
+  world.addCreature('wolf-2', 'wolf', { x: 5, z: 0, rotation: 0 });
+
+  assert.equal(world.getEntity('wolf-1').level, 2);
+  assert.equal(world.getEntity('wolf-2').level, CREATURES.wolf.level);
+});
+
+test('a creature moves along the ground and stays inside the world', () => {
+  const world = createWorldState();
+  world.addCreature('wolf-1', 'wolf', { x: -30, z: 20, rotation: 1 });
+
+  const moved = world.moveCreature('wolf-1', { x: WORLD_HALF_SIZE + 50, z: 5, rotation: 2 });
+
+  const wolf = world.getEntity('wolf-1');
+  assert.equal(moved, true);
+  const edgeHeight = groundHeightAt(WORLD_HALF_SIZE, 5);
+  assert.deepEqual([wolf.x, wolf.y, wolf.z, wolf.rotation], [WORLD_HALF_SIZE, edgeHeight, 5, 2]);
+});
+
+test('a player cannot be moved as a creature', () => {
+  const world = createWorldState();
+  world.addPlayer('alice', 'Alice', 'dawnguard', 1);
+
+  const moved = world.moveCreature('alice', { x: 5, z: 5, rotation: 0 });
+
+  assert.equal(moved, false);
+  assert.equal(world.getEntity('alice').x, 0);
+});
+
+test('a dead creature cannot move', () => {
+  const world = createWorldState();
+  world.addCreature('wolf-1', 'wolf', { x: -30, z: 20, rotation: 1 });
+  world.changeHealth('wolf-1', -CREATURES.wolf.maxHealth);
+
+  const moved = world.moveCreature('wolf-1', { x: 0, z: 0, rotation: 0 });
+
+  assert.equal(moved, false);
+  assert.equal(world.getEntity('wolf-1').x, -30);
+});
+
+test('a creature can start and stop evading', () => {
+  const world = createWorldState();
+  world.addCreature('wolf-1', 'wolf', { x: -30, z: 20, rotation: 1 });
+
+  world.setEvading('wolf-1', true);
+  const evadingWhileSet = world.getEntity('wolf-1').isEvading;
+  world.setEvading('wolf-1', false);
+
+  assert.equal(evadingWhileSet, true);
+  assert.equal(world.getEntity('wolf-1').isEvading, false);
+});
+
+test('a player cannot evade', () => {
+  const world = createWorldState();
+  world.addPlayer('alice', 'Alice', 'dawnguard', 1);
+
+  assert.equal(world.setEvading('alice', true), false);
+  assert.equal(world.getEntity('alice').isEvading, undefined);
+});
+
+test('a new NPC appears at its position with its look and without mana', () => {
+  const world = createWorldState();
+
+  world.addNpc({ id: 'marshal', name: 'Marshal', appearance: 'marshal', level: 10, x: -5, z: 3, rotation: 1 });
+
+  assert.deepEqual(world.snapshot(), [
+    {
+      id: 'marshal',
+      kind: 'npc',
+      name: 'Marshal',
+      faction: null,
+      level: 10,
+      appearance: 'marshal',
+      x: -5,
+      y: 0,
+      z: 3,
+      rotation: 1,
+      health: MAX_HEALTH,
+      maxHealth: MAX_HEALTH,
+      mana: 0,
+      maxMana: 0,
+    },
+  ]);
+});
+
+test('a player of a higher level starts with more health', () => {
+  const world = createWorldState();
+
+  world.addPlayer('alice', 'Alice', 'dawnguard', 6);
+
+  assert.equal(world.getEntity('alice').maxHealth, 150);
+  assert.equal(world.getEntity('alice').health, 150);
+});
+
+test('a level up raises the health and refills the health and mana', () => {
+  const world = createWorldState();
+  world.addPlayer('alice', 'Alice', 'dawnguard', 1);
+  world.changeHealth('alice', -60);
+  world.spendMana('alice', 40);
+
+  world.setLevel('alice', 2);
+
+  const alice = world.getEntity('alice');
+  assert.deepEqual([alice.health, alice.maxHealth, alice.mana], [110, 110, MAX_MANA]);
+});
+
+test('a dead player who gains a level stays dead', () => {
+  const world = createWorldState();
+  world.addPlayer('alice', 'Alice', 'dawnguard', 1);
+  world.changeHealth('alice', -MAX_HEALTH);
+
+  world.setLevel('alice', 2);
+
+  assert.equal(world.getEntity('alice').health, 0);
+});
+
+test('a player level can change, but a creature level cannot', () => {
+  const world = createWorldState();
+  world.addPlayer('alice', 'Alice', 'dawnguard', 1);
+  world.addCreature('wolf-1', 'wolf', { x: -30, z: 20, rotation: 1 });
+
+  world.setLevel('alice', 3);
+
+  assert.equal(world.getEntity('alice').level, 3);
+  assert.equal(world.setLevel('wolf-1', 3), false);
+  assert.equal(world.getEntity('wolf-1').level, CREATURES.wolf.level);
+});
+
+test('a removed creature leaves the world, but removeCreature cannot remove a player', () => {
+  const world = createWorldState();
+  world.addPlayer('alice', 'Alice', 'dawnguard', 1);
+  world.addCreature('spiderling-1', 'spiderling', { x: 0, z: 5, rotation: 0 });
+
+  const removedCreature = world.removeCreature('spiderling-1');
+  const removedPlayer = world.removeCreature('alice');
+
+  assert.deepEqual([removedCreature, removedPlayer], [true, false]);
+  assert.deepEqual(
+    world.snapshot().map((entity) => entity.id),
+    ['alice'],
+  );
 });
 
 test('a removed player no longer appears in the snapshot', () => {

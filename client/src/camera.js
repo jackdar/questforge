@@ -1,6 +1,11 @@
 import * as THREE from 'three';
+import { activeTerrain } from './active-map.js';
 
 const ROTATE_SPEED = 0.005;
+const CAMERA_CLEARANCE = 0.5;
+const CLEARANCE_STEP = 0.2;
+// The camera never comes closer than this, so the character model does not fill the whole screen.
+const MIN_CLEAR_DISTANCE = 0.6;
 const ZOOM_SPEED = 0.01;
 const MIN_PITCH = 0.05;
 const MAX_PITCH = 1.4;
@@ -47,13 +52,16 @@ export function createThirdPersonCamera(camera, domElement) {
     { passive: false },
   );
 
+  // As in WoW, the camera comes closer instead of going into a wall, a hill, or a ceiling behind the player.
   function update(target) {
-    const horizontalDistance = Math.cos(pitch) * distance;
-    camera.position.set(
-      target.x + Math.sin(yaw) * horizontalDistance,
-      target.y + ORBIT_HEIGHT + Math.sin(pitch) * distance,
-      target.z + Math.cos(yaw) * horizontalDistance,
+    const pivot = new THREE.Vector3(target.x, target.y + ORBIT_HEIGHT, target.z);
+    const direction = new THREE.Vector3(
+      Math.sin(yaw) * Math.cos(pitch),
+      Math.sin(pitch),
+      Math.cos(yaw) * Math.cos(pitch),
     );
+    const clearDistance = clearCameraDistance(pivot, direction, distance, activeTerrain());
+    camera.position.copy(pivot).addScaledVector(direction, clearDistance);
     camera.lookAt(target.x, target.y + ORBIT_HEIGHT + LOOK_HEIGHT, target.z);
     // The renderer updates the camera matrices only when it draws. Update them now, so that the nameplates and
     // damage numbers placed later in this frame use this frame's camera and do not trail one frame behind.
@@ -64,4 +72,17 @@ export function createThirdPersonCamera(camera, domElement) {
   const isTurningCharacter = () => isDragging && dragButton === RIGHT_MOUSE_BUTTON;
 
   return { update, getYaw: () => yaw, isTurningCharacter };
+}
+
+// The distance from the pivot, along the direction, that the camera can go before the ground or the ceiling is too
+// close. The camera then stops just before the obstacle.
+export function clearCameraDistance(pivot, direction, wantedDistance, terrain) {
+  const point = new THREE.Vector3();
+  for (let travelled = CLEARANCE_STEP; travelled <= wantedDistance; travelled += CLEARANCE_STEP) {
+    point.copy(pivot).addScaledVector(direction, travelled);
+    const isInGround = terrain.groundHeightAt(point.x, point.z) + CAMERA_CLEARANCE > point.y;
+    const isInCeiling = terrain.ceilingHeight !== undefined && point.y > terrain.ceilingHeight - CAMERA_CLEARANCE;
+    if (isInGround || isInCeiling) return Math.max(travelled - CLEARANCE_STEP, MIN_CLEAR_DISTANCE);
+  }
+  return wantedDistance;
 }

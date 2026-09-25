@@ -5,10 +5,13 @@ export const KEYBINDS = [
   { keys: 'Right-drag', action: 'Turn your character' },
   { keys: 'Mouse wheel', action: 'Zoom' },
   { keys: 'Left-click', action: 'Target a character' },
+  { keys: 'Right-click', action: 'Talk to someone, loot a corpse, or invite a player' },
   { keys: 'Tab', action: 'Target the nearest enemy' },
   { keys: 'F1', action: 'Target yourself' },
   { keys: '1 – 5', action: 'Use an ability' },
   { keys: 'Enter', action: 'Chat' },
+  { keys: 'B', action: 'Open or close your bags' },
+  { keys: 'V', action: 'Show all nameplates or only the target' },
   { keys: 'Esc', action: 'Clear the target or open the menu' },
   { keys: 'H', action: 'Show or hide this help' },
 ];

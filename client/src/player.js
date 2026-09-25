@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { groundHeightAt } from 'questforge-shared/terrain.js';
-import { WORLD_HALF_SIZE } from './world.js';
+import { MAX_WALKABLE_SLOPE } from 'questforge-shared/terrain.js';
+import { activeTerrain } from './active-map.js';
 import { createCharacterModel, disposeCharacterModel } from './character-model.js';
 import { createCharacterAnimator } from './character-animator.js';
 import { isTypingInFormField } from './keyboard.js';
@@ -13,8 +13,11 @@ const GROUND_TOLERANCE = 0.01;
 const LYING_HEIGHT = 0.2;
 
 // The character root uses the rotation order YXZ, so that a dead character falls onto its back whichever way it faces.
-export function setDeadPose(root, isDead, height) {
-  root.rotation.x = isDead ? -Math.PI / 2 : 0;
+// A four-legged creature falls onto its side instead.
+export function setDeadPose(root, isDead, height, { fallsOnSide = false } = {}) {
+  const fallAngle = isDead ? -Math.PI / 2 : 0;
+  root.rotation.x = fallsOnSide ? 0 : fallAngle;
+  root.rotation.z = fallsOnSide ? fallAngle : 0;
   root.position.y = height + (isDead ? LYING_HEIGHT : 0);
 }
 
@@ -71,7 +74,7 @@ export function createPlayer(scene) {
     isJumpRequested = false;
 
     if (isDead) {
-      height = groundHeightAt(mesh.position.x, mesh.position.z);
+      height = activeTerrain().groundHeightAt(mesh.position.x, mesh.position.z);
       isAirborne = false;
       verticalSpeed = 0;
       setDeadPose(mesh, true, height);
@@ -87,21 +90,26 @@ export function createPlayer(scene) {
     // In the air only a right-button drag turns the character, as in WoW.
     if ((hasMoveInput && !isAirborne) || isTurningWithCamera) mesh.rotation.y = cameraYaw + Math.PI;
 
+    // Wading through the river slows the character. A jump keeps the speed it had at take-off.
+    const speedFactor = activeTerrain().movementSpeedFactorAt(mesh.position.x, mesh.position.z);
+    const groundSpeed = MOVE_SPEED * speedFactor;
+
     // As in WoW, the direction and speed lock at take-off.
     if (!isAirborne && wantsToJump) {
       isAirborne = true;
       verticalSpeed = JUMP_SPEED;
-      airVelocity.copy(inputDirection).multiplyScalar(MOVE_SPEED);
+      airVelocity.copy(inputDirection).multiplyScalar(groundSpeed);
     }
 
-    const horizontalVelocity = isAirborne ? airVelocity : inputDirection.multiplyScalar(MOVE_SPEED);
-    mesh.position.addScaledVector(horizontalVelocity, deltaSeconds);
-    mesh.position.x = THREE.MathUtils.clamp(mesh.position.x, -WORLD_HALF_SIZE, WORLD_HALF_SIZE);
-    mesh.position.z = THREE.MathUtils.clamp(mesh.position.z, -WORLD_HALF_SIZE, WORLD_HALF_SIZE);
+    const horizontalVelocity = isAirborne ? airVelocity : inputDirection.multiplyScalar(groundSpeed);
+    const stepDistance = horizontalVelocity.length() * deltaSeconds;
+    moveHorizontally(horizontalVelocity, deltaSeconds);
 
-    const ground = groundHeightAt(mesh.position.x, mesh.position.z);
-    if (!isAirborne && ground < height - GROUND_TOLERANCE) {
-      // The ground dropped away under the feet, for example at a ledge, so the character falls with its current speed.
+    // Walking down a slope keeps the feet on the ground. Only a drop steeper than a walkable slope, such as a ledge,
+    // makes the character fall with its current speed.
+    const ground = activeTerrain().groundHeightAt(mesh.position.x, mesh.position.z);
+    const walkableDrop = GROUND_TOLERANCE + stepDistance * MAX_WALKABLE_SLOPE;
+    if (!isAirborne && ground < height - walkableDrop) {
       isAirborne = true;
       verticalSpeed = 0;
       airVelocity.copy(horizontalVelocity);
@@ -122,6 +130,27 @@ export function createPlayer(scene) {
 
     setDeadPose(mesh, false, height);
     animator?.update(now, deltaSeconds, { isMoving: hasMoveInput && !isAirborne, isAirborne });
+  }
+
+  // On the ground, a step that climbs steeper than a walkable slope does not happen. The character then slides
+  // along the slope on one axis if that axis is walkable, so it can walk along a mountainside instead of sticking.
+  function moveHorizontally(velocity, deltaSeconds) {
+    const step = { x: velocity.x * deltaSeconds, z: velocity.z * deltaSeconds };
+    const candidates = isAirborne
+      ? [step]
+      : [step, { x: step.x, z: 0 }, { x: 0, z: step.z }].filter(({ x, z }) => x !== 0 || z !== 0);
+    const walkableStep = candidates.find((candidate) => isAirborne || isWalkable(candidate));
+    if (!walkableStep) return;
+
+    const { halfSize } = activeTerrain();
+    mesh.position.x = THREE.MathUtils.clamp(mesh.position.x + walkableStep.x, -halfSize, halfSize);
+    mesh.position.z = THREE.MathUtils.clamp(mesh.position.z + walkableStep.z, -halfSize, halfSize);
+  }
+
+  function isWalkable({ x, z }) {
+    const distance = Math.hypot(x, z);
+    const rise = activeTerrain().groundHeightAt(mesh.position.x + x, mesh.position.z + z) - height;
+    return rise <= distance * MAX_WALKABLE_SLOPE + GROUND_TOLERANCE;
   }
 
   function getMovementState() {

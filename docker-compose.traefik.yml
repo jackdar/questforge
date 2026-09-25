@@ -1,0 +1,21 @@
+# Use this file on a host where Traefik sends traffic to Docker containers.
+# Start the stack with: docker compose -f docker-compose.yml -f docker-compose.traefik.yml up -d --build
+# Traefik reaches nginx over the Traefik network, so the stack publishes no port on the host.
+services:
+  web:
+    ports: !reset []
+    networks:
+      - frontend
+      - traefik
+    labels:
+      traefik.enable: 'true'
+      traefik.docker.network: ${TRAEFIK_NETWORK:-proxy}
+      traefik.http.routers.questforge.entrypoints: ${TRAEFIK_ENTRYPOINT:-https}
+      traefik.http.routers.questforge.rule: Host(`${QUESTFORGE_DOMAIN:?Set QUESTFORGE_DOMAIN in .env to the domain of the game.}`)
+      traefik.http.routers.questforge.tls: 'true'
+      traefik.http.services.questforge.loadbalancer.server.port: '80'
+
+networks:
+  traefik:
+    name: ${TRAEFIK_NETWORK:-proxy}
+    external: true

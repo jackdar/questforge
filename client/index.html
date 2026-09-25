@@ -4,11 +4,46 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Questforge</title>
+    <link rel="preload" href="/fonts/cinzel-latin-variable.woff2" as="font" type="font/woff2" crossorigin />
     <style>
+      /* The fonts ship with the game, under the SIL Open Font License (see public/fonts). Cinzel has the carved
+         look of a fantasy game for titles and names. Alegreya Sans stays easy to read in chat and quest text. */
+      @font-face {
+        font-family: 'Cinzel';
+        font-style: normal;
+        font-weight: 400 900;
+        font-display: swap;
+        src: url('/fonts/cinzel-latin-variable.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Alegreya Sans';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/alegreya-sans-latin-400.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Alegreya Sans';
+        font-style: normal;
+        font-weight: 500;
+        font-display: swap;
+        src: url('/fonts/alegreya-sans-latin-500.woff2') format('woff2');
+      }
+      @font-face {
+        font-family: 'Alegreya Sans';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/fonts/alegreya-sans-latin-700.woff2') format('woff2');
+      }
+      :root {
+        --font-display: 'Cinzel', Georgia, serif;
+        --font-body: 'Alegreya Sans', system-ui, sans-serif;
+      }
       body {
         margin: 0;
         overflow: hidden;
-        font-family: system-ui, sans-serif;
+        font-family: var(--font-body);
       }
       #controls {
         position: fixed;
@@ -119,6 +154,10 @@
       .unit-name[data-relationship='hostile'] {
         color: #ff5b5b;
       }
+      .unit-name[data-relationship='neutral'],
+      .nameplate[data-relationship='neutral'] {
+        color: #ffd200;
+      }
       .unit-name[data-relationship='friendly'] {
         color: #5dde7a;
       }
@@ -170,7 +209,7 @@
         padding: 4px;
         overflow: hidden;
         color: #fff;
-        font: 11px system-ui, sans-serif;
+        font: 11px var(--font-body);
         background: #1d2330;
         border: 2px solid #5b6478;
         border-radius: 6px;
@@ -200,6 +239,36 @@
         left: 0;
         height: 0;
         background: rgb(0 0 0 / 65%);
+      }
+      /* The XP bar sits right above the action bar and has the same width. */
+      #xp-bar {
+        position: fixed;
+        bottom: 90px;
+        left: 50%;
+        width: 404px;
+        height: 12px;
+        overflow: hidden;
+        background: rgb(0 0 0 / 60%);
+        border: 1px solid #000;
+        border-radius: 3px;
+        transform: translateX(-50%);
+        user-select: none;
+      }
+      #xp-bar[hidden] {
+        display: none;
+      }
+      .xp-fill {
+        height: 100%;
+        background: #8a4fd8;
+      }
+      .xp-text {
+        position: absolute;
+        inset: 0;
+        color: #fff;
+        font-size: 10px;
+        line-height: 12px;
+        text-align: center;
+        text-shadow: 0 1px 1px #000;
       }
       #cast-bar {
         position: fixed;
@@ -237,6 +306,19 @@
         text-shadow: 0 1px 2px #000;
         pointer-events: none;
       }
+      #quest-message {
+        position: fixed;
+        z-index: 10;
+        top: 104px;
+        right: 0;
+        left: 0;
+        color: #ffd200;
+        font-size: 15px;
+        font-weight: 600;
+        text-align: center;
+        text-shadow: 0 1px 2px #000;
+        pointer-events: none;
+      }
       #floating-text-layer {
         position: fixed;
         inset: 0;
@@ -255,6 +337,13 @@
       }
       .floating-text.heal {
         color: #5dff7a;
+      }
+      .floating-text.poison {
+        color: #7be04a;
+      }
+      .floating-text.evade {
+        color: #e0e0e0;
+        font-size: 15px;
       }
       .screen {
         position: fixed;
@@ -304,7 +393,7 @@
         flex: 1;
         padding: 8px;
         color: #fff;
-        font: 600 14px system-ui, sans-serif;
+        font: 600 14px var(--font-body);
         background: #2f3a52;
         border: 1px solid #5b6478;
         border-radius: 4px;
@@ -340,7 +429,7 @@
         width: 180px;
         padding: 12px;
         color: #fff;
-        font: 600 18px system-ui, sans-serif;
+        font: 600 18px var(--font-body);
         border: 2px solid #fff;
         border-radius: 6px;
         cursor: pointer;
@@ -374,7 +463,7 @@
         align-items: flex-start;
         padding: 8px 10px;
         color: #fff;
-        font: 14px system-ui, sans-serif;
+        font: 14px var(--font-body);
         text-align: left;
         background: #0e1119;
         border: 1px solid #5b6478;
@@ -404,6 +493,26 @@
         white-space: nowrap;
         text-shadow: 0 1px 2px #000;
         transform: translate(-50%, -100%);
+      }
+      .nameplate-level {
+        margin-right: 4px;
+        font-size: 11px;
+      }
+      /* The level colours follow the WoW difficulty colours. */
+      [data-difficulty='grey'] {
+        color: #9d9d9d;
+      }
+      [data-difficulty='green'] {
+        color: #40bf40;
+      }
+      [data-difficulty='yellow'] {
+        color: #ffff00;
+      }
+      [data-difficulty='orange'] {
+        color: #ff8040;
+      }
+      [data-difficulty='red'] {
+        color: #ff1a1a;
       }
       .nameplate[data-relationship='self'] {
         color: #fff;
@@ -439,11 +548,545 @@
       .game-menu-panel button {
         padding: 8px;
         color: #fff;
-        font: 600 14px system-ui, sans-serif;
+        font: 600 14px var(--font-body);
         background: #2f3a52;
         border: 1px solid #5b6478;
         border-radius: 4px;
         cursor: pointer;
+      }
+      .game-menu-panel[hidden] {
+        display: none;
+      }
+      .volume-control {
+        display: grid;
+        grid-template-columns: 100px 1fr 40px;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+      }
+      .setting-checkbox {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .setting-checkbox input {
+        accent-color: #ffd24a;
+      }
+      .volume-control input {
+        accent-color: #ffd24a;
+      }
+      .volume-control output {
+        color: #c8c8c8;
+        font: 12px ui-monospace, monospace;
+        text-align: right;
+      }
+      #loot-window {
+        position: fixed;
+        z-index: 4;
+        top: 30%;
+        left: 30%;
+        width: 220px;
+        padding: 8px;
+        color: #fff;
+        background: rgb(20 24 34 / 95%);
+        border: 1px solid #5b6478;
+        border-radius: 6px;
+        user-select: none;
+      }
+      #loot-window[hidden] {
+        display: none;
+      }
+      .loot-header,
+      .bag-header,
+      .quest-dialog-header,
+      .shop-header {
+        cursor: move;
+      }
+      #shop-window {
+        position: fixed;
+        z-index: 4;
+        top: 20%;
+        left: 12px;
+        width: 260px;
+        padding: 8px;
+        color: #fff;
+        background: rgb(20 24 34 / 95%);
+        border: 1px solid #5b6478;
+        border-radius: 6px;
+        user-select: none;
+      }
+      #shop-window[hidden] {
+        display: none;
+      }
+      .shop-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+        color: #ffd24a;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .shop-header button {
+        padding: 0 6px;
+        color: #fff;
+        font-size: 16px;
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+      .shop-tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 6px;
+      }
+      .shop-tabs button {
+        flex: 1;
+        padding: 4px;
+        color: #c8c8c8;
+        font: 600 12px var(--font-body);
+        background: #1d2330;
+        border: 1px solid #5b6478;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .shop-tabs button.active {
+        color: #ffd24a;
+        border-color: #ffd24a;
+      }
+      .shop-empty {
+        margin: 6px 0;
+        color: #9d9d9d;
+        font-size: 13px;
+      }
+      .shop-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .shop-item {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 8px;
+        font: 600 13px var(--font-body);
+        text-align: left;
+        background: #0e1119;
+        border: 1px solid #5b6478;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .shop-item:hover {
+        border-color: #ffd24a;
+      }
+      /* The shop marker is a gold coin instead of a letter. */
+      .quest-marker[data-marker='shop'] {
+        width: 16px;
+        height: 16px;
+        background: radial-gradient(circle at 35% 35%, #fff3a0, #ffd200 45%, #a07800);
+        border: 1px solid #5a4300;
+        border-radius: 50%;
+        box-shadow: 0 0 3px #000;
+      }
+      #quest-marker-layer {
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+      .quest-marker {
+        position: absolute;
+        font: 900 30px var(--font-body);
+        text-shadow:
+          0 0 3px #000,
+          0 1px 2px #000;
+        transform: translate(-50%, -100%);
+      }
+      .quest-marker[data-marker='available'],
+      .quest-marker[data-marker='turnIn'] {
+        color: #ffd200;
+      }
+      .quest-marker[data-marker='inProgress'] {
+        color: #a0a0a0;
+      }
+      #quest-tracker {
+        position: fixed;
+        top: 44px;
+        right: 12px;
+        width: 240px;
+        color: #fff;
+        font-size: 12px;
+        text-shadow: 0 1px 2px #000;
+        user-select: none;
+      }
+      #quest-tracker[hidden] {
+        display: none;
+      }
+      .quest-tracker-heading {
+        margin-bottom: 4px;
+        color: #ffd24a;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .quest-tracker-entry {
+        margin-bottom: 8px;
+      }
+      .quest-tracker-title {
+        color: #ffd24a;
+        font-weight: 600;
+      }
+      .quest-complete {
+        color: #5dde7a;
+      }
+      .quest-objective {
+        color: #e0e0e0;
+      }
+      .quest-objective.met {
+        color: #9d9d9d;
+      }
+      .quest-abandon {
+        margin-left: 6px;
+        padding: 0 4px;
+        color: #c8c8c8;
+        font: 10px var(--font-body);
+        background: rgb(0 0 0 / 40%);
+        border: 1px solid #5b6478;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+      #quest-dialog {
+        position: fixed;
+        z-index: 4;
+        top: 20%;
+        left: 24%;
+        width: 320px;
+        padding: 10px 12px;
+        color: #f0e6d0;
+        font-size: 13px;
+        background: rgb(32 26 18 / 96%);
+        border: 1px solid #8a6b3a;
+        border-radius: 6px;
+        user-select: none;
+      }
+      #quest-dialog[hidden] {
+        display: none;
+      }
+      .quest-dialog-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #ffd24a;
+        font-size: 15px;
+        font-weight: 700;
+      }
+      .quest-dialog-header button {
+        padding: 0 6px;
+        color: #fff;
+        font-size: 16px;
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+      .quest-dialog-body p {
+        margin: 6px 0;
+      }
+      .quest-dialog-body h3 {
+        margin: 10px 0 2px;
+        color: #ffd24a;
+        font-size: 13px;
+      }
+      .quest-level {
+        color: #c8b89a;
+        font-size: 12px;
+      }
+      .quest-list-item {
+        display: block;
+        width: 100%;
+        margin: 4px 0;
+        padding: 6px 8px;
+        color: #f0e6d0;
+        font: 600 13px var(--font-body);
+        text-align: left;
+        background: rgb(0 0 0 / 30%);
+        border: 1px solid #8a6b3a;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .quest-dialog-buttons {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .quest-dialog-buttons button {
+        flex: 1;
+        padding: 6px;
+        color: #fff;
+        font: 600 13px var(--font-body);
+        background: #5a3d1a;
+        border: 1px solid #8a6b3a;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .loot-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .loot-header button {
+        padding: 0 6px;
+        color: #fff;
+        font-size: 16px;
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+      .loot-list {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .loot-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 8px;
+        font: 600 13px var(--font-body);
+        text-align: left;
+        background: #0e1119;
+        border: 1px solid #5b6478;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .loot-item:hover {
+        border-color: #ffd24a;
+      }
+      .loot-item-quantity {
+        color: #fff;
+      }
+      #bag-window {
+        position: fixed;
+        z-index: 4;
+        right: 12px;
+        bottom: 16px;
+        padding: 8px;
+        color: #fff;
+        background: rgb(20 24 34 / 95%);
+        border: 1px solid #5b6478;
+        border-radius: 6px;
+        user-select: none;
+      }
+      #bag-window[hidden] {
+        display: none;
+      }
+      .bag-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .bag-header button {
+        padding: 0 6px;
+        color: #fff;
+        font-size: 16px;
+        background: none;
+        border: none;
+        cursor: pointer;
+      }
+      .bag-slots {
+        display: grid;
+        grid-template-columns: repeat(4, 64px);
+        gap: 6px;
+      }
+      /* A bag slot has the same square shape as an action button. */
+      .bag-slot {
+        position: relative;
+        box-sizing: border-box;
+        width: 64px;
+        height: 64px;
+        padding: 4px;
+        overflow: hidden;
+        font: 600 11px var(--font-body);
+        background: #1d2330;
+        border: 2px solid #5b6478;
+        border-radius: 6px;
+      }
+      .bag-slot[draggable='true'] {
+        cursor: grab;
+      }
+      .bag-slot.dragging {
+        opacity: 0.4;
+      }
+      .bag-slot.drop-target {
+        border-color: #ffd24a;
+      }
+      .bag-slot[data-quality='uncommon'] {
+        border-color: #1eff00;
+      }
+      .bag-money {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 6px;
+      }
+      /* The coin colours follow WoW. */
+      .coin {
+        font: 600 12px var(--font-body);
+      }
+      .coin-gold {
+        color: #ffd700;
+      }
+      .coin-silver {
+        color: #c7c7cf;
+      }
+      .coin-copper {
+        color: #c87533;
+      }
+      .bag-slot-quantity {
+        position: absolute;
+        right: 5px;
+        bottom: 3px;
+        color: #fff;
+        font-size: 13px;
+        text-shadow: 0 1px 2px #000;
+      }
+      .chat-quest {
+        color: #ffd200;
+      }
+      #loading-screen {
+        z-index: 20;
+        background: #05060a;
+      }
+      .loading-label {
+        margin: 0;
+        color: #c8b89a;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+      }
+      .loading-map-name {
+        margin: 0;
+        color: #ffd24a;
+        font-size: 40px;
+      }
+      .chat-party {
+        color: #aaaaff;
+      }
+      /* As in WoW, the party frames run down the left side of the screen, under the player frame. */
+      #party-frames {
+        position: fixed;
+        top: 200px;
+        left: 12px;
+        width: 200px;
+        padding: 4px 8px;
+        color: #fff;
+        background: rgb(0 0 0 / 50%);
+        border-radius: 4px;
+      }
+      #party-frames[hidden],
+      #unit-menu[hidden],
+      #party-invite[hidden] {
+        display: none;
+      }
+      .party-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4px;
+        color: #aaaaff;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .party-header button,
+      #unit-menu button,
+      .party-invite-buttons button {
+        padding: 2px 8px;
+        color: #fff;
+        font: 600 12px var(--font-body);
+        background: #2f3a52;
+        border: 1px solid #5b6478;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .party-frame {
+        margin-bottom: 6px;
+      }
+      .party-frame .health-bar,
+      .party-frame .mana-bar {
+        height: 6px;
+      }
+      .party-frame.out-of-range,
+      .party-frame.dead {
+        opacity: 0.45;
+      }
+      .party-member-name {
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .party-member-level {
+        margin-right: 4px;
+        color: #c8c8c8;
+      }
+      #unit-menu {
+        position: fixed;
+        z-index: 6;
+        top: 96px;
+        left: 224px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 6px;
+        color: #fff;
+        background: rgb(20 24 34 / 95%);
+        border: 1px solid #5b6478;
+        border-radius: 6px;
+      }
+      .unit-menu-title {
+        color: #ffd24a;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      #party-invite {
+        position: fixed;
+        z-index: 8;
+        top: 30%;
+        left: 50%;
+        width: 280px;
+        padding: 12px;
+        color: #fff;
+        text-align: center;
+        background: rgb(20 24 34 / 96%);
+        border: 1px solid #ffd24a;
+        border-radius: 6px;
+        transform: translateX(-50%);
+      }
+      .party-invite-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+      }
+      .chat-loot {
+        color: #5dde7a;
+      }
+      /* Item name colours follow the WoW quality colours. */
+      .item-name[data-quality='poor'] {
+        color: #9d9d9d;
+      }
+      .item-name[data-quality='common'] {
+        color: #ffffff;
+      }
+      .item-name[data-quality='uncommon'] {
+        color: #1eff00;
+      }
+      .item-name[data-quality='rare'] {
+        color: #0070dd;
+      }
+      .bag-slot[data-quality='rare'] {
+        border-color: #0070dd;
       }
       .faction-button[data-faction='dawnguard'] {
         background: #1f4f99;
@@ -456,10 +1099,34 @@
       #error-message {
         user-select: none;
       }
+      /* The display font comes last, so that it wins over the font shorthands above. */
+      h1,
+      h2,
+      h3,
+      .unit-name,
+      .nameplate,
+      .floating-text,
+      .quest-marker,
+      .cast-name,
+      #quest-message,
+      #error-message,
+      .quest-dialog-header,
+      .quest-tracker-heading,
+      .quest-tracker-title,
+      .shop-header,
+      .loot-header,
+      .bag-header,
+      .faction-button,
+      .form-buttons button,
+      .account-bar button,
+      .game-menu-panel button,
+      .quest-dialog-buttons button {
+        font-family: var(--font-display);
+      }
     </style>
   </head>
   <body>
-    <div id="stats"><span class="fps">– FPS</span><span class="ping">– ms</span></div>
+    <div id="stats"><span class="clock">--:--</span><span class="fps">– FPS</span><span class="ping">– ms</span></div>
     <div id="unit-frames">
       <div id="player-frame" class="unit-frame" hidden>
         <div class="unit-name"></div>
@@ -474,16 +1141,76 @@
         <div class="mana-bar"><div class="mana-fill"></div><div class="mana-text"></div></div>
       </div>
     </div>
+    <div id="party-frames" hidden>
+      <div class="party-header">Party <button type="button" data-action="leave-party">Leave</button></div>
+      <div class="party-frame-list"></div>
+    </div>
+    <div id="unit-menu" hidden>
+      <div class="unit-menu-title"></div>
+      <button type="button" data-action="invite-to-party">Invite to party</button>
+    </div>
+    <div id="party-invite" hidden>
+      <p class="party-invite-text"></p>
+      <div class="party-invite-buttons">
+        <button type="button" data-action="accept-invite">Accept</button>
+        <button type="button" data-action="decline-invite">Decline</button>
+      </div>
+    </div>
     <div id="nameplate-layer"></div>
+    <div id="quest-marker-layer"></div>
     <div id="floating-text-layer"></div>
     <div id="error-message" hidden></div>
+    <div id="quest-message" hidden></div>
     <div id="cast-bar" hidden><div class="cast-fill"></div><div class="cast-name"></div></div>
+    <div id="xp-bar" hidden><div class="xp-fill"></div><div class="xp-text"></div></div>
     <div id="action-bar"></div>
+    <div id="quest-tracker" hidden>
+      <div class="quest-tracker-heading">Quests</div>
+      <div class="quest-tracker-list"></div>
+    </div>
+    <div id="quest-dialog" hidden>
+      <div class="quest-dialog-header">
+        <span class="quest-dialog-title"></span>
+        <button type="button" data-action="close-quest" aria-label="Close the quest window">×</button>
+      </div>
+      <div class="quest-dialog-body"></div>
+      <div class="quest-dialog-buttons"></div>
+    </div>
+    <div id="shop-window" hidden>
+      <div class="shop-header">
+        <span class="shop-title"></span>
+        <button type="button" data-action="close-shop" aria-label="Close the shop">×</button>
+      </div>
+      <div class="shop-tabs">
+        <button type="button" data-tab="buy">Buy</button>
+        <button type="button" data-tab="buyback">Buyback</button>
+      </div>
+      <div class="shop-list"></div>
+    </div>
+    <div id="bag-window" hidden>
+      <div class="bag-header">
+        <span>Bags</span>
+        <button type="button" data-action="close-bags" aria-label="Close the bags">×</button>
+      </div>
+      <div class="bag-slots"></div>
+      <div class="bag-money"></div>
+    </div>
+    <div id="loot-window" hidden>
+      <div class="loot-header">
+        <span>Loot</span>
+        <button type="button" data-action="close-loot" aria-label="Close the loot window">×</button>
+      </div>
+      <div class="loot-list"></div>
+    </div>
     <div id="chat" hidden>
       <div class="chat-log" aria-live="polite"></div>
       <form class="chat-form" hidden>
         <input name="message" autocomplete="off" placeholder="Say something, then press Enter" />
       </form>
+    </div>
+    <div id="loading-screen" class="screen" hidden>
+      <p class="loading-label">Entering</p>
+      <h1 class="loading-map-name"></h1>
     </div>
     <div id="login-screen" class="screen" hidden>
       <h1>Questforge</h1>
@@ -498,12 +1225,40 @@
       </form>
     </div>
     <div id="game-menu" class="screen" hidden>
-      <div class="game-menu-panel">
+      <div class="game-menu-panel" data-panel="main">
         <h2>Game Menu</h2>
         <button type="button" data-action="return-to-game">Return to Game</button>
+        <button type="button" data-action="open-audio">Audio</button>
+        <button type="button" data-action="open-interface">Interface</button>
         <button type="button" data-action="log-out">Log Out</button>
         <h3>Key bindings</h3>
         <div class="keybind-list"></div>
+      </div>
+      <div class="game-menu-panel" data-panel="audio" hidden>
+        <h2>Audio</h2>
+        <label class="volume-control">
+          <span>Music</span>
+          <input type="range" name="music" min="0" max="100" step="1" />
+          <output></output>
+        </label>
+        <label class="volume-control">
+          <span>Sound effects</span>
+          <input type="range" name="sfx" min="0" max="100" step="1" />
+          <output></output>
+        </label>
+        <button type="button" data-action="back-to-menu">Back</button>
+      </div>
+      <div class="game-menu-panel" data-panel="interface" hidden>
+        <h2>Interface</h2>
+        <label class="setting-checkbox">
+          <input type="checkbox" name="showAllNameplates" />
+          <span>Show all nameplates in range (V)</span>
+        </label>
+        <label class="setting-checkbox">
+          <input type="checkbox" name="showOwnNameplate" />
+          <span>Show my own nameplate</span>
+        </label>
+        <button type="button" data-action="back-to-menu">Back</button>
       </div>
     </div>
     <div id="character-select" class="screen" hidden>

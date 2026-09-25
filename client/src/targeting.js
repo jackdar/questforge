@@ -1,35 +1,45 @@
 import * as THREE from 'three';
 import { getRelationship } from 'questforge-shared/factions.js';
-import { groundHeightAt } from 'questforge-shared/terrain.js';
+import { activeTerrain } from './active-map.js';
 import { isTypingInFormField } from './keyboard.js';
+import { screenOutlineOf } from './screen-outline.js';
 
 const CLICK_MOVE_TOLERANCE_PX = 5;
 const TAB_TARGET_RANGE = 40;
 const CLICK_MARGIN_PX = 16;
-const BOX_CORNERS = [0, 1].flatMap((x) => [0, 1].flatMap((y) => [0, 1].map((z) => [x, y, z])));
 
-export function createTargeting({ scene, camera, domElement, network, playerMesh, onTargetChange }) {
+const LEFT_BUTTON = 0;
+const RIGHT_BUTTON = 2;
+
+export function createTargeting({ scene, camera, domElement, network, playerMesh, onTargetChange, onInteract }) {
   const raycaster = new THREE.Raycaster();
-  const boundingBox = new THREE.Box3();
-  const corner = new THREE.Vector3();
   const ring = createTargetRing();
   scene.add(ring);
 
   let targetId = null;
-  let pointerDownPosition = null;
+  let pointerDown = null;
 
   domElement.addEventListener('pointerdown', (event) => {
-    if (event.button === 0) pointerDownPosition = { x: event.clientX, y: event.clientY };
+    if (event.button === LEFT_BUTTON || event.button === RIGHT_BUTTON) {
+      pointerDown = { button: event.button, x: event.clientX, y: event.clientY };
+    }
   });
 
-  // Dragging with the left button turns the camera, so only a click without movement selects a target.
+  // Dragging turns the camera or the character, so only a click without movement acts.
+  // As in WoW, a left click selects a target, and a right click also interacts with it, for example to loot it.
   domElement.addEventListener('pointerup', (event) => {
-    if (event.button !== 0 || !pointerDownPosition) return;
-    const distanceMoved = Math.hypot(event.clientX - pointerDownPosition.x, event.clientY - pointerDownPosition.y);
-    pointerDownPosition = null;
+    if (!pointerDown || event.button !== pointerDown.button) return;
+    const distanceMoved = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+    pointerDown = null;
     if (distanceMoved > CLICK_MOVE_TOLERANCE_PX) return;
 
-    setTarget(pickEntityAt(event.clientX, event.clientY));
+    const entityId = pickEntityAt(event.clientX, event.clientY);
+    if (event.button === LEFT_BUTTON) {
+      setTarget(entityId);
+    } else if (entityId) {
+      setTarget(entityId);
+      onInteract(entityId);
+    }
   });
 
   window.addEventListener('keydown', (event) => {
@@ -76,7 +86,7 @@ export function createTargeting({ scene, camera, domElement, network, playerMesh
     let closest = null;
 
     for (const character of characters) {
-      const outline = screenOutlineOf(character, bounds);
+      const outline = screenOutlineOf(character, camera, bounds);
       if (!outline) continue;
 
       const isNear =
@@ -92,32 +102,6 @@ export function createTargeting({ scene, camera, domElement, network, playerMesh
     }
 
     return closest ? findEntityId(closest.character) : null;
-  }
-
-  // The screen rectangle around the 3D bounding box of a character, or null when part of it is behind the camera.
-  function screenOutlineOf(character, bounds) {
-    boundingBox.setFromObject(character);
-    if (boundingBox.isEmpty()) return null;
-
-    const outline = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
-    for (const [useMaxX, useMaxY, useMaxZ] of BOX_CORNERS) {
-      corner
-        .set(
-          useMaxX ? boundingBox.max.x : boundingBox.min.x,
-          useMaxY ? boundingBox.max.y : boundingBox.min.y,
-          useMaxZ ? boundingBox.max.z : boundingBox.min.z,
-        )
-        .project(camera);
-      if (corner.z > 1) return null;
-
-      const screenX = ((corner.x + 1) / 2) * bounds.width;
-      const screenY = ((1 - corner.y) / 2) * bounds.height;
-      outline.left = Math.min(outline.left, screenX);
-      outline.right = Math.max(outline.right, screenX);
-      outline.top = Math.min(outline.top, screenY);
-      outline.bottom = Math.max(outline.bottom, screenY);
-    }
-    return outline;
   }
 
   function nextTabTarget() {
@@ -158,7 +142,7 @@ export function createTargeting({ scene, camera, domElement, network, playerMesh
     if (!target) return;
     const { x, z } = target.mesh.position;
     // The ring stays on the ground under a target that jumps.
-    ring.position.set(x, groundHeightAt(x, z) + 0.05, z);
+    ring.position.set(x, activeTerrain().groundHeightAt(x, z) + 0.05, z);
   }
 
   function clearTarget() {
