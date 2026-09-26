@@ -1,13 +1,14 @@
 import * as THREE from 'three';
 import { BANDIT_CAMP, STARTING_CAMP } from 'questforge-shared/places.js';
-import { groundHeightAt, RIVER, riverCenterX } from 'questforge-shared/terrain.js';
+import { OVERWORLD_TERRAIN, RIVER, riverCenterX, VIEW_DISTANCE } from 'questforge-shared/terrain.js';
 import { createTerrainMesh } from './terrain-mesh.js';
 import { createBridge, createRiverWater } from './river.js';
 import { createBanditCamp } from './bandit-camp.js';
 import { createStartingCamp } from './starting-camp.js';
-import { applySky, SHADOW_AREA_SIZE, SHADOW_MAP_SIZE } from './day-night.js';
+import { applySky, SHADOW_AREA_SIZE, SHADOW_CAMERA_FAR, SHADOW_MAP_SIZE } from './day-night.js';
 import { PORTALS } from 'questforge-shared/maps.js';
 import { createPortal, createPortalArch } from './portal.js';
+import { createBlenderMap, hasBlenderTrees } from './overworld-map.js';
 
 
 const TREE_COUNT = 60;
@@ -17,7 +18,7 @@ const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 // another map. The update moves the parts that change over time: the light of the day, the camps, and the portals.
 export function createOverworldScenery(scene) {
   scene.background = new THREE.Color(0x87b8e0);
-  scene.fog = new THREE.Fog(0x87b8e0, 60, 180);
+  scene.fog = new THREE.Fog(0x87b8e0, 60, VIEW_DISTANCE);
   const root = new THREE.Group();
 
   const ambient = new THREE.HemisphereLight(0xdfefff, 0x4a5a30, 1.2);
@@ -25,17 +26,25 @@ export function createOverworldScenery(scene) {
   const sunDisc = createSkyDisc(0xfff2c0, 9);
   const moonDisc = createSkyDisc(0xe8ecff, 6);
   // The light aims at its target, and the target must be in the scene for the light to follow it.
-  root.add(ambient, celestialLight, celestialLight.target, sunDisc, moonDisc, createTerrainMesh());
-  root.add(createRiverWater(), createBridge());
+  root.add(ambient, celestialLight, celestialLight.target, sunDisc, moonDisc);
+  const blenderMap = createBlenderMap();
+  if (blenderMap) {
+    root.add(blenderMap, createSea(OVERWORLD_TERRAIN));
+  } else {
+    root.add(createTerrainMesh(), createRiverWater(), createBridge());
+  }
 
-  for (const position of treePositions()) root.add(createTree(position));
+  // The trees of a Blender map come with the map. Without them, the game grows its own.
+  if (!hasBlenderTrees()) {
+    for (const position of treePositions()) root.add(createTree(position));
+  }
 
   const camps = [createBanditCamp(), createStartingCamp()];
   for (const camp of camps) root.add(camp.group);
 
   const portals = PORTALS.filter((portal) => portal.mapId === 'overworld').map((place) => {
-    root.add(createPortalArch(place, groundHeightAt));
-    return createPortal(place, groundHeightAt);
+    root.add(createPortalArch(place, OVERWORLD_TERRAIN.groundHeightAt));
+    return createPortal(place, OVERWORLD_TERRAIN.groundHeightAt);
   });
   for (const portal of portals) root.add(portal.object);
   scene.add(root);
@@ -44,19 +53,35 @@ export function createOverworldScenery(scene) {
     const lighting = { scene, celestialLight, ambient, sunDisc, moonDisc, cameraPosition, playerPosition };
     const daylight = applySky(dayFraction, lighting);
     for (const camp of camps) camp.update(time, daylight);
-    for (const portal of portals) portal.update(time);
+    for (const portal of portals) portal.update(time, cameraPosition, scene.fog);
   }
 
   return { root, update };
 }
 
-// No tree grows inside a camp or in the river and on its banks, so that those places have open ground.
+// No tree grows inside a camp, in the river and on its banks, or in water, so that those places have open ground.
 const RIVER_CLEAR_DISTANCE = RIVER.halfWidth + RIVER.bankWidth + 2;
 
 export function treePositions() {
   return Array.from({ length: TREE_COUNT }, (_, index) => treePosition(index)).filter(
-    (position) => !isInsideACamp(position) && Math.abs(position.x - riverCenterX(position.z)) > RIVER_CLEAR_DISTANCE,
+    (position) =>
+      !isInsideACamp(position) &&
+      Math.abs(position.x - riverCenterX(position.z)) > RIVER_CLEAR_DISTANCE &&
+      OVERWORLD_TERRAIN.waterDepthAt(position.x, position.z) === 0,
   );
+}
+
+// The sea reaches far past the edge of the map, so the fog hides where it ends.
+const SEA_MARGIN = 1000;
+
+function createSea({ bounds, seaLevel }) {
+  const width = bounds.maxX - bounds.minX + SEA_MARGIN * 2;
+  const depth = bounds.maxZ - bounds.minZ + SEA_MARGIN * 2;
+  const material = new THREE.MeshStandardMaterial({ color: 0x2f6f9f, transparent: true, opacity: 0.75, roughness: 0.3 });
+  const sea = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), material);
+  sea.rotation.x = -Math.PI / 2;
+  sea.position.set((bounds.minX + bounds.maxX) / 2, seaLevel, (bounds.minZ + bounds.maxZ) / 2);
+  return sea;
 }
 
 function isInsideACamp({ x, z }) {
@@ -70,7 +95,13 @@ function createCelestialLight() {
   light.castShadow = true;
   light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
   const halfArea = SHADOW_AREA_SIZE / 2;
-  Object.assign(light.shadow.camera, { left: -halfArea, right: halfArea, top: halfArea, bottom: -halfArea });
+  Object.assign(light.shadow.camera, {
+    left: -halfArea,
+    right: halfArea,
+    top: halfArea,
+    bottom: -halfArea,
+    far: SHADOW_CAMERA_FAR,
+  });
   return light;
 }
 
@@ -86,7 +117,7 @@ function treePosition(index) {
   const radius = 12 + ((index * 37) % 80);
   const x = Math.cos(angle) * radius;
   const z = Math.sin(angle) * radius;
-  return new THREE.Vector3(x, groundHeightAt(x, z), z);
+  return new THREE.Vector3(x, OVERWORLD_TERRAIN.groundHeightAt(x, z), z);
 }
 
 function createTree(position) {

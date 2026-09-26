@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { BANDIT_CAMP } from 'questforge-shared/places.js';
-import { groundHeightAt } from 'questforge-shared/terrain.js';
+import { OVERWORLD_TERRAIN } from 'questforge-shared/terrain.js';
 import {
   createBarrel,
   createCampfire,
@@ -39,7 +39,7 @@ const TORCH_PLACES = [
 export function createBanditCamp() {
   const camp = new THREE.Group();
   // The camp stands on the flat top of its hill.
-  camp.position.set(BANDIT_CAMP.x, groundHeightAt(BANDIT_CAMP.x, BANDIT_CAMP.z), BANDIT_CAMP.z);
+  camp.position.set(BANDIT_CAMP.x, OVERWORLD_TERRAIN.groundHeightAt(BANDIT_CAMP.x, BANDIT_CAMP.z), BANDIT_CAMP.z);
 
   const fire = createCampfire();
   const torches = TORCH_PLACES.map((place, index) => createTorch(place, index * 1.7));

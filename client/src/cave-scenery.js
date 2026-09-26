@@ -65,9 +65,9 @@ export function createCaveScenery(scene) {
   scene.add(root);
 
   // The cave has no sky, so the time of day does not change it. The torches always burn.
-  function update(time) {
+  function update(time, dayFraction, { cameraPosition }) {
     for (const torch of torches) torch.update(time, NIGHT);
-    for (const portal of portals) portal.update(time);
+    for (const portal of portals) portal.update(time, cameraPosition, scene.fog);
   }
 
   return { root, update };

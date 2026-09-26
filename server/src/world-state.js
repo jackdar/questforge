@@ -1,4 +1,4 @@
-import { OVERWORLD_TERRAIN, WORLD_MAX_HEIGHT } from 'questforge-shared/terrain.js';
+import { clampToBounds, OVERWORLD_TERRAIN, WORLD_MAX_HEIGHT } from 'questforge-shared/terrain.js';
 import { CREATURES } from 'questforge-shared/creatures.js';
 import { playerMaxHealth } from 'questforge-shared/leveling.js';
 
@@ -9,7 +9,7 @@ export const DUMMY_LEVEL = 1;
 // Each map has its own world with its own terrain. A player enters at the given place, such as the arrival point of
 // a portal, and always respawns at the spawn point of the map.
 export function createWorldState({ terrain = OVERWORLD_TERRAIN, playerSpawn = { x: 0, z: 0, rotation: 0 } } = {}) {
-  const { groundHeightAt, halfSize } = terrain;
+  const { groundHeightAt, bounds } = terrain;
   const entities = new Map();
   const spawns = new Map();
 
@@ -81,8 +81,7 @@ export function createWorldState({ terrain = OVERWORLD_TERRAIN, playerSpawn = { 
     if (player?.kind !== 'player' || player.health === 0) return false;
     if (![x, y, z, rotation].every(Number.isFinite)) return false;
 
-    player.x = clamp(x, -halfSize, halfSize);
-    player.z = clamp(z, -halfSize, halfSize);
+    ({ x: player.x, z: player.z } = clampToBounds(bounds, x, z));
     player.y = clamp(y, groundHeightAt(player.x, player.z), WORLD_MAX_HEIGHT);
     player.rotation = rotation;
     return true;
@@ -93,8 +92,7 @@ export function createWorldState({ terrain = OVERWORLD_TERRAIN, playerSpawn = { 
     const creature = entities.get(id);
     if (!creature || creature.kind === 'player' || creature.health === 0) return false;
 
-    creature.x = clamp(x, -halfSize, halfSize);
-    creature.z = clamp(z, -halfSize, halfSize);
+    ({ x: creature.x, z: creature.z } = clampToBounds(bounds, x, z));
     creature.y = groundHeightAt(creature.x, creature.z);
     creature.rotation = rotation;
     return true;

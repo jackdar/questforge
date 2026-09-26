@@ -12,9 +12,9 @@ export function loginPlaceFor(lastPosition) {
     return exit?.arrival ?? overworld.spawn;
   }
 
-  const { halfSize } = overworld.terrain;
+  const { minX, maxX, minZ, maxZ } = overworld.terrain.bounds;
   const { x, z, rotation } = lastPosition;
-  const isInsideMap = [x, z].every((value) => Number.isFinite(value) && Math.abs(value) <= halfSize);
+  const isInsideMap = Number.isFinite(x) && Number.isFinite(z) && x >= minX && x <= maxX && z >= minZ && z <= maxZ;
   if (!isInsideMap) return overworld.spawn;
   return { x, z, rotation: Number.isFinite(rotation) ? rotation : 0 };
 }

@@ -287,6 +287,22 @@ test('moving a player past the world edge clamps it to the edge', () => {
   assert.equal(alice.z, -WORLD_HALF_SIZE);
 });
 
+test('a player stays inside the bounds of a map that is not square', () => {
+  const terrain = {
+    bounds: { minX: -10, maxX: 30, minZ: -5, maxZ: 5 },
+    groundHeightAt: () => 0,
+    waterDepthAt: () => 0,
+    movementSpeedFactorAt: () => 1,
+  };
+  const world = createWorldState({ terrain });
+  world.addPlayer('alice', 'Alice', 'dawnguard', 1);
+
+  world.movePlayer('alice', { x: 500, y: 0, z: -500, rotation: 0 });
+
+  const [alice] = world.snapshot();
+  assert.deepEqual([alice.x, alice.z], [30, -5]);
+});
+
 test('a move with non-numeric values is rejected and changes nothing', () => {
   const world = createWorldState();
   world.addPlayer('alice', 'Alice', 'dawnguard', 1);

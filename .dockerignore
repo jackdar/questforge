@@ -4,3 +4,5 @@ client/dist
 .env
 .git
 *.log
+**/*.blend
+**/*.blend1

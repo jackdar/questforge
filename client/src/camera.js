@@ -14,12 +14,15 @@ const MAX_DISTANCE = 30;
 const ORBIT_HEIGHT = 1;
 const LOOK_HEIGHT = 1.5;
 const RIGHT_MOUSE_BUTTON = 2;
+// How fast the camera moves back out after an obstacle stops blocking it, as a fraction of the gap per second.
+const RETURN_RATE = 6;
 
 export function createThirdPersonCamera(camera, domElement) {
   // A yaw of PI puts the camera behind a character that faces +z, as a new player does at spawn.
   let yaw = Math.PI;
   let pitch = 0.4;
   let distance = 10;
+  let shownDistance = distance;
   let isDragging = false;
   let dragButton = null;
 
@@ -53,7 +56,7 @@ export function createThirdPersonCamera(camera, domElement) {
   );
 
   // As in WoW, the camera comes closer instead of going into a wall, a hill, or a ceiling behind the player.
-  function update(target) {
+  function update(target, deltaSeconds) {
     const pivot = new THREE.Vector3(target.x, target.y + ORBIT_HEIGHT, target.z);
     const direction = new THREE.Vector3(
       Math.sin(yaw) * Math.cos(pitch),
@@ -61,8 +64,9 @@ export function createThirdPersonCamera(camera, domElement) {
       Math.cos(yaw) * Math.cos(pitch),
     );
     const clearDistance = clearCameraDistance(pivot, direction, distance, activeTerrain());
-    camera.position.copy(pivot).addScaledVector(direction, clearDistance);
-    camera.lookAt(target.x, target.y + ORBIT_HEIGHT + LOOK_HEIGHT, target.z);
+    shownDistance = nextShownDistance(shownDistance, clearDistance, deltaSeconds);
+    camera.position.copy(pivot).addScaledVector(direction, shownDistance);
+    camera.lookAt(cameraLookPoint(pivot, direction, distance, shownDistance));
     // The renderer updates the camera matrices only when it draws. Update them now, so that the nameplates and
     // damage numbers placed later in this frame use this frame's camera and do not trail one frame behind.
     camera.updateMatrixWorld();
@@ -72,6 +76,22 @@ export function createThirdPersonCamera(camera, domElement) {
   const isTurningCharacter = () => isDragging && dragButton === RIGHT_MOUSE_BUTTON;
 
   return { update, getYaw: () => yaw, isTurningCharacter };
+}
+
+// The camera jumps in at once, so it never shows the inside of a wall, and glides back out, so it does not flicker
+// while the player walks along a wall.
+export function nextShownDistance(shownDistance, clearDistance, deltaSeconds) {
+  if (clearDistance <= shownDistance) return clearDistance;
+  return shownDistance + (clearDistance - shownDistance) * Math.min(RETURN_RATE * deltaSeconds, 1);
+}
+
+// A camera that an obstacle pushes in keeps the view direction that it has at its wanted distance. It aims at a
+// point above the head of the character, and without this it would look steeply up when it comes very close.
+export function cameraLookPoint(pivot, direction, wantedDistance, shownDistance) {
+  return pivot
+    .clone()
+    .add(new THREE.Vector3(0, LOOK_HEIGHT, 0))
+    .addScaledVector(direction, shownDistance - wantedDistance);
 }
 
 // The distance from the pivot, along the direction, that the camera can go before the ground or the ceiling is too

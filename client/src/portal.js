@@ -28,6 +28,7 @@ export function createPortal({ x, z, rotation }, groundHeightAt) {
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      fog: false,
     }),
   );
   swirl.position.y = CENTER_HEIGHT;
@@ -41,6 +42,7 @@ export function createPortal({ x, z, rotation }, groundHeightAt) {
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
+      fog: false,
     }),
   );
   sparks.position.y = CENTER_HEIGHT;
@@ -50,11 +52,13 @@ export function createPortal({ x, z, rotation }, groundHeightAt) {
   portal.add(ring, swirl, sparks, light);
 
   // Each spark circles inward from the ring to the middle and starts again, at its own point in the circle.
-  function update(time) {
+  function update(time, cameraPosition, fog) {
     const seconds = time / 1000;
+    const visibility = visibilityThroughFog(cameraPosition.distanceTo(portal.position), fog);
     swirl.rotation.z = seconds * 0.8;
-    swirl.material.opacity = 0.5 + 0.12 * Math.sin(seconds * 2.3);
-    light.intensity = LIGHT_INTENSITY * (1 + 0.15 * Math.sin(seconds * 3.1));
+    swirl.material.opacity = (0.5 + 0.12 * Math.sin(seconds * 2.3)) * visibility;
+    sparks.material.opacity = visibility;
+    light.intensity = LIGHT_INTENSITY * (1 + 0.15 * Math.sin(seconds * 3.1)) * visibility;
 
     const positions = sparks.geometry.attributes.position;
     for (let index = 0; index < SPARK_COUNT; index++) {
@@ -67,6 +71,13 @@ export function createPortal({ x, z, rotation }, groundHeightAt) {
   }
 
   return { object: portal, update };
+}
+
+// Fog tints a surface toward the fog colour, but an additive glow adds that colour to the sky behind it, so a glow
+// in the fog shines brighter than the fog. The glows of the portal turn off the fog and fade out with distance
+// instead, from 1 where the fog starts to 0 where it hides everything.
+export function visibilityThroughFog(distance, { near, far }) {
+  return 1 - THREE.MathUtils.smoothstep(distance, near, far);
 }
 
 // Two rough stone pillars and a lintel frame the portal in the cave mouth.

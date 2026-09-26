@@ -30,6 +30,10 @@ export const RIVER = {
 // Water deeper than this slows a player or a creature to half speed, as they wade.
 export const WADING_DEPTH = 0.3;
 export const WADING_SPEED_FACTOR = 0.5;
+// In water deeper than this, a player swims: the feet hang this far below the surface, so the head stays above it.
+export const SWIM_DEPTH = 1.3;
+// The overworld fog hides everything farther than this from the camera.
+export const VIEW_DISTANCE = 180;
 
 // The cave mouth is a corridor cut into the mountains of the north-east corner, opposite the bandit camp. Its end is
 // rounded, so the mountain closes around the portal on three sides.
@@ -128,5 +132,28 @@ function smoothstep(value, edgeFrom, edgeTo) {
   return t * t * (3 - 2 * t);
 }
 
-// A map terrain gives the ground height, the speed factor, and the size of its square. Every map has one.
-export const OVERWORLD_TERRAIN = { halfSize: WORLD_HALF_SIZE, groundHeightAt, movementSpeedFactorAt };
+// A map terrain gives the ground height, the water depth, the speed factor, and the bounds. Every map has one. The
+// calculated terrains also give the size of the square that their ground mesh covers.
+export const OVERWORLD_TERRAIN = {
+  halfSize: WORLD_HALF_SIZE,
+  bounds: squareBounds(WORLD_HALF_SIZE),
+  groundHeightAt,
+  waterDepthAt,
+  movementSpeedFactorAt,
+};
+
+// The bounds are the area that players and creatures can move in: { minX, maxX, minZ, maxZ }.
+export function squareBounds(halfSize) {
+  return { minX: -halfSize, maxX: halfSize, minZ: -halfSize, maxZ: halfSize };
+}
+
+export function clampToBounds({ minX, maxX, minZ, maxZ }, x, z) {
+  return { x: Math.min(Math.max(x, minX), maxX), z: Math.min(Math.max(z, minZ), maxZ) };
+}
+
+// The height of the feet of a character that stands or swims at a place. In deep water it floats at the surface.
+export function standingHeightAt(terrain, x, z) {
+  const ground = terrain.groundHeightAt(x, z);
+  const depth = terrain.waterDepthAt(x, z);
+  return depth > SWIM_DEPTH ? ground + depth - SWIM_DEPTH : ground;
+}

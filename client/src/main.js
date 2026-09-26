@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createMapScenery } from './map-scenery.js';
+import { loadOverworldMap } from './overworld-map.js';
 import { activeMapId, setActiveMap } from './active-map.js';
 import { MAPS } from 'questforge-shared/maps.js';
 import { createPlayer } from './player.js';
@@ -21,6 +22,7 @@ import { createXpBar } from './xp-bar.js';
 import { displayRelationship } from './relationship-display.js';
 import { createPartyFrames, createPartyInvitePrompt, createUnitMenu } from './party-frames.js';
 import { createStatsDisplay } from './stats.js';
+import { createCompass } from './compass.js';
 import { createLoginScreen } from './login-screen.js';
 import { createCharacterSelectScreen } from './character-select.js';
 import { createCharacterCreateScreen } from './character-create.js';
@@ -64,6 +66,21 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
 
+// The globs find the files of the Blender map when the map build has made them. Without them, the client still
+// builds and the overworld keeps its calculated terrain.
+const [overworldGrid] = Object.values(
+  import.meta.glob('../../shared/maps/overworld-heights.json', { eager: true, import: 'default' }),
+);
+const [overworldHeightFileUrl] = Object.values(
+  import.meta.glob('../../shared/maps/overworld-heights.bin', { eager: true, query: '?url', import: 'default' }),
+);
+const [overworldModelUrl] = Object.values(
+  import.meta.glob('../../assets/maps/map_01_overworld.glb', { eager: true, query: '?url', import: 'default' }),
+);
+if (overworldGrid && overworldHeightFileUrl && overworldModelUrl) {
+  await loadOverworldMap({ grid: overworldGrid, heightFileUrl: overworldHeightFileUrl, modelUrl: overworldModelUrl });
+}
+
 let scenery = createMapScenery('overworld', scene);
 // The loading screen stays up this long, so the player sees where they go and the new map has time to settle.
 const MAP_LOADING_SCREEN_MS = 700;
@@ -84,6 +101,7 @@ const hud = createHud();
 const audio = createAudio(window.localStorage);
 const interfaceSettings = createInterfaceSettings(window.localStorage);
 const stats = createStatsDisplay();
+const compass = createCompass();
 const nameplates = createNameplates(camera, interfaceSettings);
 const lootSparkles = createLootSparkles(scene);
 const lootWindow = createLootWindow({
@@ -129,7 +147,7 @@ const characterSelect = createCharacterSelectScreen({
   onLogout: logOut,
 });
 const gameMenu = createGameMenu({ onLogOut: leaveWorld, audio, interfaceSettings });
-const chat = createChat((text) => network.sendChat(text));
+const chat = createChat(sendChatOrCommand);
 const characterCreate = createCharacterCreateScreen({
   onCreated: (character) => characterSelect.show({ selectCharacterId: character.id }),
   onBack: () => characterSelect.show(),
@@ -331,6 +349,18 @@ window.addEventListener('keydown', (event) => {
   }
 });
 
+// The /fly command helps to look around a map while we build it. Only the development build has it, because the
+// server does not check flight.
+function sendChatOrCommand(text) {
+  if (import.meta.env.DEV && text.trim().toLowerCase() === '/fly') {
+    player.setFlying(!player.isFlying());
+    const help = 'Hold Space to climb and Shift to drop. Type /fly again to land.';
+    chat.addSystemMessage(player.isFlying() ? `You fly. ${help}` : 'You stop flying.');
+    return;
+  }
+  network.sendChat(text);
+}
+
 async function logOut() {
   const result = await logout();
   if (!result.ok) {
@@ -511,6 +541,7 @@ renderer.setAnimationLoop((time) => {
   const localPlayer = network.getLocalPlayer();
 
   player.mesh.visible = Boolean(localPlayer);
+  compass.setVisible(Boolean(localPlayer));
   if (localPlayer) {
     player.update(deltaSeconds, cameraRig.getYaw(), {
       isDead: localPlayer.health === 0,
@@ -518,9 +549,10 @@ renderer.setAnimationLoop((time) => {
       now: time,
     });
     network.sendPosition(player.getMovementState(), time);
+    compass.update(player.mesh.rotation.y);
   }
   network.update(deltaSeconds, time);
-  cameraRig.update(player.mesh.position);
+  cameraRig.update(player.mesh.position, deltaSeconds);
   targeting.update();
   spellEffects.update(deltaSeconds, time);
   const dayFraction = timeOfDay(Date.now() + serverClockOffsetMs);

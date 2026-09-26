@@ -6,6 +6,7 @@ import { createParties, playersSharingKill } from './parties.js';
 import { createMapInstance } from './map-instance.js';
 import { createInstances } from './instances.js';
 import { loginPlaceFor } from './login-place.js';
+import { loadOverworldHeightGrid } from './overworld-map.js';
 import { portalAt } from 'questforge-shared/maps.js';
 import { createDatabasePool, connectWithRetry, runMigrations } from './database.js';
 import { createAccountStore } from './account-store.js';
@@ -33,6 +34,10 @@ const httpServer = createServer();
 const socketServer = new WebSocketServer({ noServer: true });
 const parties = createParties();
 const connectionsByPlayerId = new Map();
+// The overworld instance reads its terrain when the server makes it, so the height grid must load first.
+const usesBlenderOverworld = await loadOverworldHeightGrid();
+console.log(`The overworld uses the ${usesBlenderOverworld ? 'Blender map height grid' : 'calculated terrain'}.`);
+
 // Each connection keeps the map instance that its player is in, and every game message acts on that instance.
 const instances = createInstances({
   parties,

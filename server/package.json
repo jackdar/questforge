@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "node --env-file-if-exists=../.env --watch src/index.js",
     "start": "node src/index.js",
-    "test": "node --env-file-if-exists=../.env --test"
+    "test": "node --env-file-if-exists=../.env --test",
+    "build:map": "node scripts/build-map.js"
   },
   "dependencies": {
     "pg": "^8.23.0",

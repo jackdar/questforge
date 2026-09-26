@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { clearCameraDistance } from '../src/camera.js';
+import { cameraLookPoint, clearCameraDistance, nextShownDistance } from '../src/camera.js';
 
 const flatGround = { groundHeightAt: () => 0 };
 // A wall of rock rises from x = 5 on.
@@ -34,4 +34,25 @@ test('the camera keeps a small distance even with a wall right behind the player
   const wallAtOnce = { groundHeightAt: () => 20 };
 
   assert.ok(clearCameraDistance(pivot, backAlongX, 10, wallAtOnce) > 0);
+});
+
+test('a camera pushed in by a wall looks in the same direction as at its full distance', () => {
+  const fullPosition = pivot.clone().addScaledVector(upAndBack, 10);
+  const pushedPosition = pivot.clone().addScaledVector(upAndBack, 0.6);
+
+  const fullView = cameraLookPoint(pivot, upAndBack, 10, 10).sub(fullPosition).normalize();
+  const pushedView = cameraLookPoint(pivot, upAndBack, 10, 0.6).sub(pushedPosition).normalize();
+
+  assert.ok(fullView.distanceTo(pushedView) < 1e-9);
+});
+
+test('the camera jumps in to a wall at once', () => {
+  assert.equal(nextShownDistance(10, 2, 0.016), 2);
+});
+
+test('the camera glides back out after the wall stops blocking it', () => {
+  const nextDistance = nextShownDistance(2, 10, 0.016);
+
+  assert.ok(nextDistance > 2);
+  assert.ok(nextDistance < 10);
 });

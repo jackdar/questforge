@@ -1,5 +1,10 @@
 import * as THREE from 'three';
-import { MAX_WALKABLE_SLOPE } from 'questforge-shared/terrain.js';
+import {
+  clampToBounds,
+  MAX_WALKABLE_SLOPE,
+  standingHeightAt,
+  WORLD_MAX_HEIGHT,
+} from 'questforge-shared/terrain.js';
 import { activeTerrain } from './active-map.js';
 import { createCharacterModel, disposeCharacterModel } from './character-model.js';
 import { createCharacterAnimator } from './character-animator.js';
@@ -11,6 +16,9 @@ const JUMP_SPEED = 8;
 const GRAVITY = 26;
 const GROUND_TOLERANCE = 0.01;
 const LYING_HEIGHT = 0.2;
+// A flying character moves this many times faster than it walks, and climbs and drops at the climb speed.
+const FLY_SPEED_FACTOR = 4;
+const FLY_CLIMB_SPEED = 16;
 
 // The character root uses the rotation order YXZ, so that a dead character falls onto its back whichever way it faces.
 // A four-legged creature falls onto its side instead.
@@ -32,6 +40,7 @@ export function createPlayer(scene) {
   let verticalSpeed = 0;
   let isAirborne = false;
   let isJumpRequested = false;
+  let isFlying = false;
   const airVelocity = new THREE.Vector3();
 
   const pressedKeys = new Set();
@@ -74,7 +83,7 @@ export function createPlayer(scene) {
     isJumpRequested = false;
 
     if (isDead) {
-      height = activeTerrain().groundHeightAt(mesh.position.x, mesh.position.z);
+      height = standingHeightAt(activeTerrain(), mesh.position.x, mesh.position.z);
       isAirborne = false;
       verticalSpeed = 0;
       setDeadPose(mesh, true, height);
@@ -89,6 +98,11 @@ export function createPlayer(scene) {
     // Face the camera's forward direction, so that A and D strafe and S walks backwards.
     // In the air only a right-button drag turns the character, as in WoW.
     if ((hasMoveInput && !isAirborne) || isTurningWithCamera) mesh.rotation.y = cameraYaw + Math.PI;
+
+    if (isFlying) {
+      fly(deltaSeconds, inputDirection, now);
+      return;
+    }
 
     // Wading through the river slows the character. A jump keeps the speed it had at take-off.
     const speedFactor = activeTerrain().movementSpeedFactorAt(mesh.position.x, mesh.position.z);
@@ -107,7 +121,7 @@ export function createPlayer(scene) {
 
     // Walking down a slope keeps the feet on the ground. Only a drop steeper than a walkable slope, such as a ledge,
     // makes the character fall with its current speed.
-    const ground = activeTerrain().groundHeightAt(mesh.position.x, mesh.position.z);
+    const ground = standingHeightAt(activeTerrain(), mesh.position.x, mesh.position.z);
     const walkableDrop = GROUND_TOLERANCE + stepDistance * MAX_WALKABLE_SLOPE;
     if (!isAirborne && ground < height - walkableDrop) {
       isAirborne = true;
@@ -142,22 +156,58 @@ export function createPlayer(scene) {
     const walkableStep = candidates.find((candidate) => isAirborne || isWalkable(candidate));
     if (!walkableStep) return;
 
-    const { halfSize } = activeTerrain();
-    mesh.position.x = THREE.MathUtils.clamp(mesh.position.x + walkableStep.x, -halfSize, halfSize);
-    mesh.position.z = THREE.MathUtils.clamp(mesh.position.z + walkableStep.z, -halfSize, halfSize);
+    moveInsideBounds(mesh.position.x + walkableStep.x, mesh.position.z + walkableStep.z);
+  }
+
+  function moveInsideBounds(x, z) {
+    const inside = clampToBounds(activeTerrain().bounds, x, z);
+    mesh.position.x = inside.x;
+    mesh.position.z = inside.z;
+  }
+
+  // A flying character ignores slopes and gravity. Space climbs and Shift drops, down to the ground or the water.
+  function fly(deltaSeconds, inputDirection, now) {
+    const flySpeed = MOVE_SPEED * FLY_SPEED_FACTOR * deltaSeconds;
+    moveInsideBounds(mesh.position.x + inputDirection.x * flySpeed, mesh.position.z + inputDirection.z * flySpeed);
+
+    const terrain = activeTerrain();
+    const isDropping = pressedKeys.has('ShiftLeft') || pressedKeys.has('ShiftRight');
+    const climbInput = Number(pressedKeys.has('Space')) - Number(isDropping);
+    const lowest = standingHeightAt(terrain, mesh.position.x, mesh.position.z);
+    const highest = terrain.ceilingHeight ?? WORLD_MAX_HEIGHT;
+    height = THREE.MathUtils.clamp(height + climbInput * FLY_CLIMB_SPEED * deltaSeconds, lowest, highest);
+
+    setDeadPose(mesh, false, height);
+    animator?.update(now, deltaSeconds, { isMoving: inputDirection.lengthSq() > 0, isAirborne: false });
+  }
+
+  // Turning flight off in the air makes the character fall.
+  function setFlying(shouldFly) {
+    isFlying = shouldFly;
+    isAirborne = !shouldFly;
+    verticalSpeed = 0;
+    airVelocity.set(0, 0, 0);
   }
 
   function isWalkable({ x, z }) {
-    const distance = Math.hypot(x, z);
-    const rise = activeTerrain().groundHeightAt(mesh.position.x + x, mesh.position.z + z) - height;
-    return rise <= distance * MAX_WALKABLE_SLOPE + GROUND_TOLERANCE;
+    const rise = standingHeightAt(activeTerrain(), mesh.position.x + x, mesh.position.z + z) - height;
+    return rise <= Math.hypot(x, z) * MAX_WALKABLE_SLOPE + GROUND_TOLERANCE;
   }
 
   function getMovementState() {
     return { x: mesh.position.x, y: height, z: mesh.position.z, rotation: mesh.rotation.y };
   }
 
-  return { mesh, update, setAppearance, setPosition, getMovementState, getAnimator: () => animator };
+  return {
+    mesh,
+    update,
+    setAppearance,
+    setPosition,
+    setFlying,
+    isFlying: () => isFlying,
+    getMovementState,
+    getAnimator: () => animator,
+  };
 }
 
 function moveDirection(cameraYaw, forwardInput, strafeInput) {

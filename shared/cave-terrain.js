@@ -1,3 +1,5 @@
+import { squareBounds } from './terrain.js';
+
 // The spider cave is a separate, fully enclosed map. Its floor is flat, and its walls are ground that rises far too
 // steeply to walk up, so the slope limit keeps players inside, as the mountains do in the overworld.
 // The cave is a winding passage of tunnels and chambers. Each point on the path has a radius: the floor reaches
@@ -42,9 +44,13 @@ function distanceOutsideTunnel(x, z, from, to) {
   return Math.max(distance - radius, 0);
 }
 
+const CAVE_HALF_SIZE = 70;
+
 export const CAVE_TERRAIN = {
-  halfSize: 70,
+  halfSize: CAVE_HALF_SIZE,
+  bounds: squareBounds(CAVE_HALF_SIZE),
   ceilingHeight: CAVE_CEILING_HEIGHT,
   groundHeightAt: caveGroundHeightAt,
+  waterDepthAt: () => 0,
   movementSpeedFactorAt: () => 1,
 };

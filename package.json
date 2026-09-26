@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "npm run db:dev && (npm run dev -w server & npm run dev -w client)",
     "test": "npm run db:dev && npm test --workspaces --if-present",
-    "db:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait db"
+    "db:dev": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait db",
+    "build:map": "npm run build:map -w server"
   }
 }

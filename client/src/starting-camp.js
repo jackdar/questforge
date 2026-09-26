@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { STARTING_CAMP } from 'questforge-shared/places.js';
-import { groundHeightAt } from 'questforge-shared/terrain.js';
+import { OVERWORLD_TERRAIN } from 'questforge-shared/terrain.js';
 import {
   createBarrel,
   createCampfire,
@@ -29,7 +29,8 @@ const TORCH_PLACES = Array.from({ length: 6 }, (_, index) => {
 
 export function createStartingCamp() {
   const camp = new THREE.Group();
-  camp.position.set(STARTING_CAMP.x, groundHeightAt(STARTING_CAMP.x, STARTING_CAMP.z), STARTING_CAMP.z);
+  const groundHeight = OVERWORLD_TERRAIN.groundHeightAt(STARTING_CAMP.x, STARTING_CAMP.z);
+  camp.position.set(STARTING_CAMP.x, groundHeight, STARTING_CAMP.z);
 
   const fire = createCampfire();
   const torches = TORCH_PLACES.map((place, index) => createTorch(place, index * 1.3));

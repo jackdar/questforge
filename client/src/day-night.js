@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VIEW_DISTANCE } from 'questforge-shared/terrain.js';
 
 const NIGHT_SKY = new THREE.Color(0x0b1026);
 const DAY_SKY = new THREE.Color(0x87b8e0);
@@ -10,11 +11,17 @@ const MOON_INTENSITY = 0.6;
 // At night the world stays dim but playable, so the ambient light never goes below this.
 const NIGHT_AMBIENT_INTENSITY = 0.25;
 const DAY_AMBIENT_INTENSITY = 1.2;
-const LIGHT_DISTANCE = 60;
-// The shadows cover a square around the player, the same size as the shadow camera of the light in world.js.
+// The shadows cover a square around the player, the same size as the shadow camera of the light in world.js. The
+// square reaches the view distance on every side, so everything that the player can see casts its shadow.
 // The square moves in steps of one shadow map pixel, so that the shadow edges do not shimmer while the player walks.
-export const SHADOW_AREA_SIZE = 120;
-export const SHADOW_MAP_SIZE = 2048;
+export const SHADOW_AREA_SIZE = VIEW_DISTANCE * 2;
+export const SHADOW_MAP_SIZE = 4096;
+// The light stands far enough from the middle of the square that the whole square is in front of it, even when the
+// sun is low. The shadow camera must reach the far corner of the square behind the middle.
+const LIGHT_DISTANCE = SHADOW_AREA_SIZE;
+export const SHADOW_CAMERA_FAR = LIGHT_DISTANCE + SHADOW_AREA_SIZE;
+// How far the light leans to the side for each unit of distance, so the shadows keep the same direction as before.
+const LIGHT_SIDE_LEAN = 1 / 3;
 const SHADOW_PIXEL = SHADOW_AREA_SIZE / SHADOW_MAP_SIZE;
 const SKY_DISC_DISTANCE = 170;
 // The light and the discs lean a little to the side, so that the sun and moon do not pass straight overhead.
@@ -73,7 +80,7 @@ export function applySky(dayFraction, lighting) {
   celestialLight.position.set(
     shadowCenter.x + x * LIGHT_DISTANCE,
     y * LIGHT_DISTANCE,
-    shadowCenter.z + SKY_SIDE_OFFSET,
+    shadowCenter.z + LIGHT_SIDE_LEAN * LIGHT_DISTANCE,
   );
   celestialLight.intensity = sky.lightIntensity;
   celestialLight.color.copy(sky.lightColor);

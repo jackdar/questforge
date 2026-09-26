@@ -7,6 +7,7 @@ COPY shared/package.json shared/
 RUN npm ci
 COPY shared shared
 COPY client client
+COPY assets/maps/*.glb assets/maps/
 RUN npm run build -w client
 
 FROM nginx:stable-alpine AS web
